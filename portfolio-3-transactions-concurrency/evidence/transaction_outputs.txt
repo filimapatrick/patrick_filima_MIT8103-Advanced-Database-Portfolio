@@ -1,0 +1,555 @@
+\timing on
+Timing is on.
+-- ============================================================================
+-- 0. PRE-FLIGHT AUDIT & ENVIRONMENT INITIALISATION
+-- ============================================================================
+SELECT current_database(), current_user, version();
+ current_database | current_user |                                                           version                                                            
+------------------+--------------+------------------------------------------------------------------------------------------------------------------------------
+ anrdms           | patrick      | PostgreSQL 16.16 (Homebrew) on aarch64-apple-darwin25.6.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit
+(1 row)
+
+Time: 1.033 ms
+SHOW default_transaction_isolation;
+ default_transaction_isolation 
+-------------------------------
+ read committed
+(1 row)
+
+Time: 0.057 ms
+SHOW transaction_read_only;
+ transaction_read_only 
+-----------------------
+ off
+(1 row)
+
+Time: 0.033 ms
+-- Ensure clean, reproducible execution state by removing any artifacts from previous runs
+DELETE FROM qc_evaluations WHERE scan_id IN ('SCN-LOS-006-T1', 'SCN-LOS-007-T1', 'SCN-LOS-008-T1');
+DELETE 1
+Time: 3.501 ms
+DELETE FROM processing_jobs WHERE scan_id IN ('SCN-LOS-006-T1', 'SCN-LOS-007-T1', 'SCN-LOS-008-T1');
+DELETE 1
+Time: 0.615 ms
+DELETE FROM mri_scans WHERE scan_id IN ('SCN-LOS-006-T1', 'SCN-LOS-007-T1', 'SCN-LOS-008-T1');
+DELETE 2
+Time: 4.705 ms
+DELETE FROM participant_diagnoses WHERE participant_id IN ('ANRDMS-LOS-006', 'ANRDMS-LOS-007', 'ANRDMS-LOS-008');
+DELETE 1
+Time: 0.801 ms
+DELETE FROM participants WHERE participant_id IN ('ANRDMS-LOS-006', 'ANRDMS-LOS-007', 'ANRDMS-LOS-008');
+DELETE 2
+Time: 2.118 ms
+-- ============================================================================
+-- 1. TRANSACTION 1: ATOMIC MULTI-TABLE COMMIT (ATOMICITY & CONSISTENCY)
+-- ============================================================================
+-- Scenario:
+--   A new patient is enrolled at Lagos University Teaching Hospital (LUTH).
+--   The clinical research protocol requires an all-or-nothing transaction spanning:
+--     1. Participant demographic registration (participants)
+--     2. Neurological baseline diagnosis assignment (participant_diagnoses)
+--     3. Initial high-resolution MRI structural acquisition (mri_scans)
+--     4. Immediate baseline radiologist quality evaluation (qc_evaluations)
+--   If any step fails, the entire transaction must abort, preventing orphan data.
+-- ============================================================================
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+BEGIN
+Time: 0.057 ms
+-- Step 1.1: Register new research participant
+INSERT INTO participants (
+    participant_id,
+    primary_site_id,
+    enrollment_date,
+    birth_year,
+    biological_sex,
+    handedness,
+    education_years,
+    consent_obtained
+) VALUES (
+    'ANRDMS-LOS-006',
+    'SITE-LOS-01',
+    '2026-11-14',
+    1968,
+    'Male',
+    'Right',
+    16,
+    TRUE
+);
+INSERT 0 1
+Time: 2.524 ms
+-- Step 1.2: Assign verified clinical stroke diagnosis
+INSERT INTO participant_diagnoses (
+    participant_id,
+    diagnosis_code,
+    diagnosing_researcher_id,
+    diagnosis_date,
+    severity_stage,
+    is_primary_diagnosis,
+    clinical_notes
+) VALUES (
+    'ANRDMS-LOS-006',
+    'DX-STR-001',
+    'RES-002',
+    '2026-11-14',
+    'Moderate',
+    TRUE,
+    'Acute onset right hemiparesis. Urgent baseline MRI acquired within 6 hours.'
+);
+INSERT 0 1
+Time: 1.403 ms
+-- Step 1.3: Register T1w MPRAGE neuroimaging scan session
+INSERT INTO mri_scans (
+    scan_id,
+    participant_id,
+    scanner_id,
+    project_id,
+    acquisition_date,
+    modality,
+    sequence_type,
+    repetition_time_ms,
+    echo_time_ms,
+    flip_angle_deg,
+    voxel_size_x_mm,
+    voxel_size_y_mm,
+    voxel_size_z_mm,
+    matrix_x,
+    matrix_y,
+    slices_count,
+    dicom_series_uid,
+    bids_relative_path,
+    file_size_bytes
+) VALUES (
+    'SCN-LOS-006-T1',
+    'ANRDMS-LOS-006',
+    'SCN-LOS-3T01',
+    'PRJ-WASCS-2024',
+    '2026-11-14 10:15:00+01',
+    'MRI',
+    'T1w',
+    2300.00,
+    2.98,
+    9.0,
+    1.00,
+    1.00,
+    1.00,
+    256,
+    256,
+    176,
+    '1.3.12.2.1107.5.2.32.45123.20261114.1001.001',
+    'sub-LOS006/ses-01/anat/sub-LOS006_ses-01_T1w.nii.gz',
+    25482310
+);
+INSERT 0 1
+Time: 1.803 ms
+-- Step 1.4: Record immediate post-acquisition QC evaluation
+INSERT INTO qc_evaluations (
+    scan_id,
+    evaluator_id,
+    evaluation_date,
+    overall_quality,
+    snr_score,
+    cnr_score,
+    head_motion_fd_mean_mm,
+    usable_for_analysis,
+    artifact_notes
+) VALUES (
+    'SCN-LOS-006-T1',
+    'RES-002',
+    '2026-11-14 11:30:00+01',
+    'PASS',
+    19.85,
+    8.42,
+    0.115,
+    TRUE,
+    'Excellent structural grey/white matter contrast; minimal subject motion.'
+);
+INSERT 0 1
+Time: 0.335 ms
+COMMIT;
+COMMIT
+Time: 0.186 ms
+-- Verification of Transaction 1 commit across all four tables:
+SELECT 
+    p.participant_id,
+    p.biological_sex,
+    p.birth_year,
+    pd.diagnosis_code,
+    pd.severity_stage,
+    s.scan_id,
+    s.sequence_type,
+    qc.overall_quality,
+    qc.snr_score
+FROM participants p
+JOIN participant_diagnoses pd ON p.participant_id = pd.participant_id
+JOIN mri_scans s ON p.participant_id = s.participant_id
+JOIN qc_evaluations qc ON s.scan_id = qc.scan_id
+WHERE p.participant_id = 'ANRDMS-LOS-006';
+ participant_id | biological_sex | birth_year | diagnosis_code | severity_stage |    scan_id     | sequence_type | overall_quality | snr_score 
+----------------+----------------+------------+----------------+----------------+----------------+---------------+-----------------+-----------
+ ANRDMS-LOS-006 | Male           |       1968 | DX-STR-001     | Moderate       | SCN-LOS-006-T1 | T1w           | PASS            |     19.85
+(1 row)
+
+Time: 0.437 ms
+-- ============================================================================
+-- 2. TRANSACTION 2: CONSTRAINT VIOLATION & ATOMIC ROLLBACK (ISOLATION & CONSISTENCY)
+-- ============================================================================
+-- Scenario:
+--   A clinical site attempts to enrol participant ANRDMS-LOS-007.
+--   The participant demographic record and diagnosis insertion succeed, but the
+--   subsequent MRI scan record contains an invalid physiological parameter:
+--   a negative repetition time (repetition_time_ms = -2300.00), violating
+--   the domain check constraint ck_scans_tr.
+--   PostgreSQL immediately raises an exception and aborts the transaction block.
+--   We execute ROLLBACK, proving that NO partial records (orphan participant or
+--   diagnosis) persist in the database.
+-- ============================================================================
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+BEGIN
+Time: 0.029 ms
+-- Step 2.1: Enrol participant ANRDMS-LOS-007
+INSERT INTO participants (
+    participant_id,
+    primary_site_id,
+    enrollment_date,
+    birth_year,
+    biological_sex,
+    handedness,
+    education_years,
+    consent_obtained
+) VALUES (
+    'ANRDMS-LOS-007',
+    'SITE-LOS-01',
+    '2026-11-14',
+    1974,
+    'Female',
+    'Right',
+    14,
+    TRUE
+);
+INSERT 0 1
+Time: 1.143 ms
+-- Step 2.2: Assign diagnosis
+INSERT INTO participant_diagnoses (
+    participant_id,
+    diagnosis_code,
+    diagnosing_researcher_id,
+    diagnosis_date,
+    severity_stage,
+    is_primary_diagnosis,
+    clinical_notes
+) VALUES (
+    'ANRDMS-LOS-007',
+    'DX-DEM-001',
+    'RES-002',
+    '2026-11-14',
+    'Mild',
+    TRUE,
+    'Suspected early-stage neurodegenerative presentation.'
+);
+INSERT 0 1
+Time: 0.233 ms
+-- Step 2.3: Attempt to insert scan with physically invalid repetition time (NEGATIVE TR)
+-- This will trigger: ERROR: new row for relation "mri_scans" violates check constraint "ck_scans_tr"
+INSERT INTO mri_scans (
+    scan_id,
+    participant_id,
+    scanner_id,
+    project_id,
+    acquisition_date,
+    modality,
+    sequence_type,
+    repetition_time_ms,
+    echo_time_ms,
+    flip_angle_deg,
+    voxel_size_x_mm,
+    voxel_size_y_mm,
+    voxel_size_z_mm,
+    matrix_x,
+    matrix_y,
+    slices_count,
+    dicom_series_uid,
+    bids_relative_path,
+    file_size_bytes
+) VALUES (
+    'SCN-LOS-007-T1',
+    'ANRDMS-LOS-007',
+    'SCN-LOS-3T01',
+    'PRJ-WASCS-2024',
+    '2026-11-14 12:00:00+01',
+    'MRI',
+    'T1w',
+    -2300.00,  -- INVALID: Violates ck_scans_tr (repetition_time_ms > 0)
+    2.98,
+    9.0,
+    1.00,
+    1.00,
+    1.00,
+    256,
+    256,
+    176,
+    '1.3.12.2.1107.5.2.32.45123.20261114.1002.001',
+    'sub-LOS007/ses-01/anat/sub-LOS007_ses-01_T1w.nii.gz',
+    25400000
+);
+psql:portfolio-3-transactions-concurrency/transactions.sql:271: ERROR:  new row for relation "mri_scans" violates check constraint "ck_scans_tr"
+DETAIL:  Failing row contains (SCN-LOS-007-T1, ANRDMS-LOS-007, SCN-LOS-3T01, PRJ-WASCS-2024, 2026-11-14 11:00:00+00, MRI, T1w, -2300.00, 2.98, 9.0, 1.00, 1.00, 1.00, 256, 256, 176, 1.3.12.2.1107.5.2.32.45123.20261114.1002.001, sub-LOS007/ses-01/anat/sub-LOS007_ses-01_T1w.nii.gz, 25400000, 2026-11-14 20:14:03.800408+00).
+Time: 1.032 ms
+-- Transaction is now in an aborted state; any subsequent command fails until ROLLBACK:
+ROLLBACK;
+ROLLBACK
+Time: 0.059 ms
+-- Verification: Confirm that zero orphan records exist for ANRDMS-LOS-007
+SELECT 
+    'participants' AS table_name, count(*) AS remaining_orphans 
+FROM participants WHERE participant_id = 'ANRDMS-LOS-007'
+UNION ALL
+SELECT 
+    'participant_diagnoses', count(*) 
+FROM participant_diagnoses WHERE participant_id = 'ANRDMS-LOS-007'
+UNION ALL
+SELECT 
+    'mri_scans', count(*) 
+FROM mri_scans WHERE participant_id = 'ANRDMS-LOS-007';
+      table_name       | remaining_orphans 
+-----------------------+-------------------
+ participants          |                 0
+ participant_diagnoses |                 0
+ mri_scans             |                 0
+(3 rows)
+
+Time: 0.550 ms
+-- ============================================================================
+-- 3. TRANSACTION 3: SAVEPOINTS & PARTIAL ROLLBACK (FINE-GRAINED FAULT TOLERANCE)
+-- ============================================================================
+-- Scenario:
+--   During an imaging intake protocol, participant ANRDMS-LOS-008 is enrolled
+--   and an MRI scan is recorded. The researcher then attempts an automated
+--   computational job dispatch to FreeSurfer.
+--   However, the job submission script specifies an invalid execution status
+--   ('QUEUED_FOR_EXECUTION'), violating constraint ck_jobs_status.
+--   Rather than aborting the entire scan session and losing clinical data,
+--   the system uses SAVEPOINT sp_scan_registered.
+--   Upon error, the transaction executes ROLLBACK TO SAVEPOINT sp_scan_registered,
+--   recovers from the job failure, dispatches a corrected job with status 'PENDING',
+--   and commits successfully.
+-- ============================================================================
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+BEGIN
+Time: 0.039 ms
+-- Step 3.1: Enrol participant ANRDMS-LOS-008
+INSERT INTO participants (
+    participant_id,
+    primary_site_id,
+    enrollment_date,
+    birth_year,
+    biological_sex,
+    handedness,
+    education_years,
+    consent_obtained
+) VALUES (
+    'ANRDMS-LOS-008',
+    'SITE-LOS-01',
+    '2026-11-14',
+    1982,
+    'Female',
+    'Right',
+    18,
+    TRUE
+);
+INSERT 0 1
+Time: 0.205 ms
+-- Step 3.2: Record scan acquisition
+INSERT INTO mri_scans (
+    scan_id,
+    participant_id,
+    scanner_id,
+    project_id,
+    acquisition_date,
+    modality,
+    sequence_type,
+    repetition_time_ms,
+    echo_time_ms,
+    flip_angle_deg,
+    voxel_size_x_mm,
+    voxel_size_y_mm,
+    voxel_size_z_mm,
+    matrix_x,
+    matrix_y,
+    slices_count,
+    dicom_series_uid,
+    bids_relative_path,
+    file_size_bytes
+) VALUES (
+    'SCN-LOS-008-T1',
+    'ANRDMS-LOS-008',
+    'SCN-LOS-3T01',
+    'PRJ-WASCS-2024',
+    '2026-11-14 13:00:00+01',
+    'MRI',
+    'T1w',
+    2300.00,
+    2.98,
+    9.0,
+    1.00,
+    1.00,
+    1.00,
+    256,
+    256,
+    176,
+    '1.3.12.2.1107.5.2.32.45123.20261114.1003.001',
+    'sub-LOS008/ses-01/anat/sub-LOS008_ses-01_T1w.nii.gz',
+    25100000
+);
+INSERT 0 1
+Time: 0.504 ms
+-- Establish explicit savepoint safeguarding participant and scan records
+SAVEPOINT sp_scan_registered;
+SAVEPOINT
+Time: 0.036 ms
+-- Step 3.3: Attempt to dispatch batch job with invalid status string
+-- This will trigger: ERROR: new row for relation "processing_jobs" violates check constraint "ck_jobs_status"
+INSERT INTO processing_jobs (
+    scan_id,
+    pipeline_id,
+    submitted_by_id,
+    status
+) VALUES (
+    'SCN-LOS-008-T1',
+    'PIP-FS-741',
+    'RES-002',
+    'QUEUED_FOR_EXECUTION' -- INVALID: Violates ck_jobs_status
+);
+psql:portfolio-3-transactions-concurrency/transactions.sql:387: ERROR:  new row for relation "processing_jobs" violates check constraint "ck_jobs_status"
+DETAIL:  Failing row contains (26, SCN-LOS-008-T1, PIP-FS-741, RES-002, 2026-11-14 20:14:03.803813+00, null, null, QUEUED_FOR_EXECUTION, null, null, null, null).
+Time: 0.250 ms
+-- Step 3.4: Recover by rolling back to savepoint (releasing failed statement lock)
+ROLLBACK TO SAVEPOINT sp_scan_registered;
+ROLLBACK
+Time: 0.034 ms
+-- Step 3.5: Execute corrected job dispatch with valid status 'PENDING'
+INSERT INTO processing_jobs (
+    scan_id,
+    pipeline_id,
+    submitted_by_id,
+    status,
+    compute_node
+) VALUES (
+    'SCN-LOS-008-T1',
+    'PIP-FS-741',
+    'RES-002',
+    'PENDING',
+    'hpc-queue-luth'
+);
+INSERT 0 1
+Time: 0.939 ms
+-- Finalize transaction
+COMMIT;
+COMMIT
+Time: 0.306 ms
+-- Verification of Savepoint resilience:
+SELECT 
+    p.participant_id,
+    s.scan_id,
+    s.sequence_type,
+    j.job_id,
+    j.pipeline_id,
+    j.status AS job_status,
+    j.compute_node
+FROM participants p
+JOIN mri_scans s ON p.participant_id = s.participant_id
+JOIN processing_jobs j ON s.scan_id = j.scan_id
+WHERE p.participant_id = 'ANRDMS-LOS-008';
+ participant_id |    scan_id     | sequence_type | job_id | pipeline_id | job_status |  compute_node  
+----------------+----------------+---------------+--------+-------------+------------+----------------
+ ANRDMS-LOS-008 | SCN-LOS-008-T1 | T1w           |     27 | PIP-FS-741  | PENDING    | hpc-queue-luth
+(1 row)
+
+Time: 0.228 ms
+-- ============================================================================
+-- 4. TRANSACTION 4: MULTI-VERSION CONCURRENCY CONTROL (MVCC) PHYSICAL INSPECTION
+-- ============================================================================
+-- Scenario:
+--   PostgreSQL achieves high-concurrency ACID transactions via Multi-Version
+--   Concurrency Control (MVCC) rather than traditional read/write locks.
+--   Every row (tuple) in PostgreSQL contains hidden system attributes:
+--     - xmin: The transaction identifier (XID) of the inserting transaction.
+--     - xmax: The transaction identifier (XID) of the updating/deleting transaction (0 if current).
+--     - ctid: The physical tuple location (block_number, tuple_offset) on disk.
+--
+--   Here we inspect these internal system headers before and after an in-place
+--   data modification, demonstrating that PostgreSQL never overwrites existing
+--   tuples on disk. Instead, an UPDATE writes a brand new physical tuple version
+--   and points the old tuple to the new version.
+-- ============================================================================
+-- Step 4.1: Examine initial physical tuple state of participant ANRDMS-LOS-006
+SELECT 
+    participant_id,
+    handedness,
+    education_years,
+    xmin::text AS inserting_xid,
+    xmax::text AS deleting_updating_xid,
+    ctid AS physical_pointer
+FROM participants
+WHERE participant_id = 'ANRDMS-LOS-006';
+ participant_id | handedness | education_years | inserting_xid | deleting_updating_xid | physical_pointer 
+----------------+------------+-----------------+---------------+-----------------------+------------------
+ ANRDMS-LOS-006 | Right      |              16 | 900           | 900                   | (0,30)
+(1 row)
+
+Time: 0.098 ms
+-- Step 4.2: Perform transactional update to demonstrate tuple non-overwrite
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+BEGIN
+Time: 0.030 ms
+UPDATE participants
+SET handedness = 'Ambidextrous',
+    education_years = 17
+WHERE participant_id = 'ANRDMS-LOS-006';
+UPDATE 1
+Time: 0.110 ms
+-- Inspect system headers INSIDE the active transaction:
+SELECT 
+    participant_id,
+    handedness,
+    education_years,
+    xmin::text AS inserting_xid,
+    xmax::text AS deleting_updating_xid,
+    ctid AS physical_pointer,
+    txid_current() AS current_transaction_xid
+FROM participants
+WHERE participant_id = 'ANRDMS-LOS-006';
+ participant_id |  handedness  | education_years | inserting_xid | deleting_updating_xid | physical_pointer | current_transaction_xid 
+----------------+--------------+-----------------+---------------+-----------------------+------------------+-------------------------
+ ANRDMS-LOS-006 | Ambidextrous |              17 | 904           | 0                     | (0,33)           |                     904
+(1 row)
+
+Time: 0.105 ms
+COMMIT;
+COMMIT
+Time: 0.119 ms
+-- Step 4.3: Inspect system headers AFTER commit:
+SELECT 
+    participant_id,
+    handedness,
+    education_years,
+    xmin::text AS inserting_xid,
+    xmax::text AS deleting_updating_xid,
+    ctid AS physical_pointer
+FROM participants
+WHERE participant_id = 'ANRDMS-LOS-006';
+ participant_id |  handedness  | education_years | inserting_xid | deleting_updating_xid | physical_pointer 
+----------------+--------------+-----------------+---------------+-----------------------+------------------
+ ANRDMS-LOS-006 | Ambidextrous |              17 | 904           | 0                     | (0,33)
+(1 row)
+
+Time: 0.098 ms
+-- Step 4.4: Inspect Write-Ahead Log (WAL) current location and sequence
+SELECT 
+    pg_current_wal_lsn() AS current_wal_flush_lsn,
+    pg_walfile_name(pg_current_wal_lsn()) AS active_wal_segment_file;
+ current_wal_flush_lsn | active_wal_segment_file  
+-----------------------+--------------------------
+ 0/EB50688             | 00000001000000000000000E
+(1 row)
+
+Time: 0.178 ms
