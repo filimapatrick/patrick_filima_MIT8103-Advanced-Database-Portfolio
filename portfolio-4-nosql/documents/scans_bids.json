@@ -1,0 +1,352 @@
+[
+  {
+    "scan_id": "SCN-LOS-001-T1",
+    "participant_id": "ANRDMS-LOS-001",
+    "site_id": "SITE-LOS-01",
+    "hospital_name": "Lagos University Teaching Hospital",
+    "session_id": "ses-01",
+    "modality": "MRI",
+    "sequence_type": "T1w",
+    "acquisition_date": "2025-01-15T08:30:00Z",
+    "bids_metadata": {
+      "bids_version": "1.9.0",
+      "relative_path": "sub-LOS001/ses-01/anat/sub-LOS001_ses-01_T1w.nii.gz",
+      "format": "NIfTI-1/gzip",
+      "checksum_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file_size_bytes": 25482310
+    },
+    "scanner_hardware": {
+      "vendor": "Siemens Healthineers",
+      "model": "Magnetom Skyra",
+      "magnetic_field_tesla": 3.0,
+      "gradient_strength_mt_m": 45.0,
+      "receive_coil": "32-Channel Head Matrix",
+      "software_version": "syngo MR E11"
+    },
+    "acquisition_parameters": {
+      "pulse_sequence_name": "t1_mprage_tra_p2_iso",
+      "repetition_time_ms": 2300.0,
+      "echo_time_ms": 2.98,
+      "inversion_time_ms": 900.0,
+      "flip_angle_deg": 9.0,
+      "voxel_size_mm": { "x": 1.0, "y": 1.0, "z": 1.0 },
+      "matrix_size": { "read": 256, "phase": 256, "slices": 176 },
+      "phase_encoding_direction": "j-"
+    },
+    "clinical_profile": {
+      "diagnosis_category": "Cerebrovascular",
+      "condition_name": "Acute ischemic stroke",
+      "severity": "Moderate",
+      "birth_year": 1968,
+      "biological_sex": "Male"
+    }
+  },
+  {
+    "scan_id": "SCN-LOS-001-DM",
+    "participant_id": "ANRDMS-LOS-001",
+    "site_id": "SITE-LOS-01",
+    "hospital_name": "Lagos University Teaching Hospital",
+    "session_id": "ses-01",
+    "modality": "MRI",
+    "sequence_type": "dMRI",
+    "acquisition_date": "2025-01-15T09:15:00Z",
+    "bids_metadata": {
+      "bids_version": "1.9.0",
+      "relative_path": "sub-LOS001/ses-01/dwi/sub-LOS001_ses-01_dwi.nii.gz",
+      "format": "NIfTI-1/gzip",
+      "checksum_sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "file_size_bytes": 145892010
+    },
+    "scanner_hardware": {
+      "vendor": "Siemens Healthineers",
+      "model": "Magnetom Skyra",
+      "magnetic_field_tesla": 3.0,
+      "gradient_strength_mt_m": 45.0,
+      "receive_coil": "32-Channel Head Matrix",
+      "software_version": "syngo MR E11"
+    },
+    "acquisition_parameters": {
+      "pulse_sequence_name": "ep_b0_1000_2000_64dir",
+      "repetition_time_ms": 4200.0,
+      "echo_time_ms": 82.0,
+      "flip_angle_deg": 90.0,
+      "voxel_size_mm": { "x": 2.0, "y": 2.0, "z": 2.0 },
+      "matrix_size": { "read": 110, "phase": 110, "slices": 64 },
+      "phase_encoding_direction": "j-",
+      "total_readout_time_s": 0.054,
+      "multiband_acceleration_factor": 2
+    },
+    "diffusion_protocol": {
+      "b_values": [0, 1000, 2000],
+      "gradient_directions_count": 64,
+      "shells": [
+        { "bval": 0, "volumes_count": 6 },
+        { "bval": 1000, "volumes_count": 32 },
+        { "bval": 2000, "volumes_count": 32 }
+      ],
+      "eddy_current_correction": true
+    },
+    "clinical_profile": {
+      "diagnosis_category": "Cerebrovascular",
+      "condition_name": "Acute ischemic stroke",
+      "severity": "Moderate",
+      "birth_year": 1968,
+      "biological_sex": "Male"
+    }
+  },
+  {
+    "scan_id": "SCN-LOS-001-FL",
+    "participant_id": "ANRDMS-LOS-001",
+    "site_id": "SITE-LOS-01",
+    "hospital_name": "Lagos University Teaching Hospital",
+    "session_id": "ses-01",
+    "modality": "MRI",
+    "sequence_type": "FLAIR",
+    "acquisition_date": "2025-01-15T09:40:00Z",
+    "bids_metadata": {
+      "bids_version": "1.9.0",
+      "relative_path": "sub-LOS001/ses-01/anat/sub-LOS001_ses-01_FLAIR.nii.gz",
+      "format": "NIfTI-1/gzip",
+      "checksum_sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+      "file_size_bytes": 31204850
+    },
+    "scanner_hardware": {
+      "vendor": "Siemens Healthineers",
+      "model": "Magnetom Skyra",
+      "magnetic_field_tesla": 3.0,
+      "gradient_strength_mt_m": 45.0,
+      "receive_coil": "32-Channel Head Matrix",
+      "software_version": "syngo MR E11"
+    },
+    "acquisition_parameters": {
+      "pulse_sequence_name": "t2_spc_flair_p2_iso",
+      "repetition_time_ms": 5000.0,
+      "echo_time_ms": 388.0,
+      "inversion_time_ms": 1800.0,
+      "flip_angle_deg": 120.0,
+      "voxel_size_mm": { "x": 1.0, "y": 1.0, "z": 1.0 },
+      "matrix_size": { "read": 256, "phase": 256, "slices": 160 }
+    },
+    "clinical_profile": {
+      "diagnosis_category": "Cerebrovascular",
+      "condition_name": "Acute ischemic stroke",
+      "severity": "Moderate",
+      "birth_year": 1968,
+      "biological_sex": "Male"
+    }
+  },
+  {
+    "scan_id": "SCN-ABJ-001-T1",
+    "participant_id": "ANRDMS-ABJ-001",
+    "site_id": "SITE-ABJ-01",
+    "hospital_name": "National Hospital Abuja",
+    "session_id": "ses-01",
+    "modality": "MRI",
+    "sequence_type": "T1w",
+    "acquisition_date": "2025-02-10T10:00:00Z",
+    "bids_metadata": {
+      "bids_version": "1.9.0",
+      "relative_path": "sub-ABJ001/ses-01/anat/sub-ABJ001_ses-01_T1w.nii.gz",
+      "format": "NIfTI-1/gzip",
+      "checksum_sha256": "6a9e1e2d78d94baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39df8",
+      "file_size_bytes": 26110900
+    },
+    "scanner_hardware": {
+      "vendor": "GE Healthcare",
+      "model": "Signa Premier",
+      "magnetic_field_tesla": 3.0,
+      "gradient_strength_mt_m": 80.0,
+      "receive_coil": "48-Channel Head Coil",
+      "software_version": "DV29.1_R02"
+    },
+    "acquisition_parameters": {
+      "pulse_sequence_name": "bravo_fspgr_3d",
+      "repetition_time_ms": 2400.0,
+      "echo_time_ms": 3.12,
+      "inversion_time_ms": 920.0,
+      "flip_angle_deg": 8.0,
+      "voxel_size_mm": { "x": 0.9, "y": 0.9, "z": 1.0 },
+      "matrix_size": { "read": 288, "phase": 288, "slices": 184 },
+      "phase_encoding_direction": "j-"
+    },
+    "clinical_profile": {
+      "diagnosis_category": "Neurodegenerative",
+      "condition_name": "Early-onset Alzheimer's dementia",
+      "severity": "Mild",
+      "birth_year": 1959,
+      "biological_sex": "Female"
+    }
+  },
+  {
+    "scan_id": "SCN-ABJ-001-FM",
+    "participant_id": "ANRDMS-ABJ-001",
+    "site_id": "SITE-ABJ-01",
+    "hospital_name": "National Hospital Abuja",
+    "session_id": "ses-01",
+    "modality": "MRI",
+    "sequence_type": "fMRI-rest",
+    "acquisition_date": "2025-02-10T10:45:00Z",
+    "bids_metadata": {
+      "bids_version": "1.9.0",
+      "relative_path": "sub-ABJ001/ses-01/func/sub-ABJ001_ses-01_task-rest_bold.nii.gz",
+      "format": "NIfTI-1/gzip",
+      "checksum_sha256": "8f4e1e2d78d94baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe310bc",
+      "file_size_bytes": 182400200
+    },
+    "scanner_hardware": {
+      "vendor": "GE Healthcare",
+      "model": "Signa Premier",
+      "magnetic_field_tesla": 3.0,
+      "gradient_strength_mt_m": 80.0,
+      "receive_coil": "48-Channel Head Coil",
+      "software_version": "DV29.1_R02"
+    },
+    "acquisition_parameters": {
+      "pulse_sequence_name": "epi_bold_fid",
+      "task_name": "rest",
+      "repetition_time_ms": 2000.0,
+      "echo_time_ms": 30.0,
+      "flip_angle_deg": 77.0,
+      "voxel_size_mm": { "x": 2.5, "y": 2.5, "z": 2.5 },
+      "matrix_size": { "read": 88, "phase": 88, "slices": 48 },
+      "phase_encoding_direction": "j-",
+      "multiband_acceleration_factor": 1,
+      "volumes_count": 240,
+      "total_acquisition_duration_s": 480.0
+    },
+    "functional_protocol": {
+      "task_instructions": "Participants instructed to remain awake with eyes fixated on crosshair.",
+      "slice_timing_order": "interleaved",
+      "dummy_scans_discarded": 5
+    },
+    "clinical_profile": {
+      "diagnosis_category": "Neurodegenerative",
+      "condition_name": "Early-onset Alzheimer's dementia",
+      "severity": "Mild",
+      "birth_year": 1959,
+      "biological_sex": "Female"
+    }
+  },
+  {
+    "scan_id": "SCN-IBD-001-T1",
+    "participant_id": "ANRDMS-IBD-001",
+    "site_id": "SITE-IBD-01",
+    "hospital_name": "University College Hospital, Ibadan",
+    "session_id": "ses-01",
+    "modality": "MRI",
+    "sequence_type": "T1w",
+    "acquisition_date": "2025-03-05T11:20:00Z",
+    "bids_metadata": {
+      "bids_version": "1.9.0",
+      "relative_path": "sub-IBD001/ses-01/anat/sub-IBD001_ses-01_T1w.nii.gz",
+      "format": "NIfTI-1/gzip",
+      "checksum_sha256": "3c7e1e2d78d94baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe344aa",
+      "file_size_bytes": 24900100
+    },
+    "scanner_hardware": {
+      "vendor": "Philips Healthcare",
+      "model": "Ingenia Elition",
+      "magnetic_field_tesla": 3.0,
+      "gradient_strength_mt_m": 45.0,
+      "receive_coil": "dStream HeadSpine 32ch",
+      "software_version": "R5.6.1"
+    },
+    "acquisition_parameters": {
+      "pulse_sequence_name": "t1_3d_tfe_sense",
+      "repetition_time_ms": 2350.0,
+      "echo_time_ms": 3.05,
+      "inversion_time_ms": 910.0,
+      "flip_angle_deg": 8.0,
+      "voxel_size_mm": { "x": 1.0, "y": 1.0, "z": 1.0 },
+      "matrix_size": { "read": 256, "phase": 256, "slices": 170 }
+    },
+    "clinical_profile": {
+      "diagnosis_category": "Epilepsy & Seizures",
+      "condition_name": "Temporal lobe epilepsy",
+      "severity": "Mild",
+      "birth_year": 1990,
+      "biological_sex": "Male"
+    }
+  },
+  {
+    "scan_id": "SCN-ENU-001-T1",
+    "participant_id": "ANRDMS-ENU-001",
+    "site_id": "SITE-ENU-01",
+    "hospital_name": "University of Nigeria Teaching Hospital",
+    "session_id": "ses-01",
+    "modality": "MRI",
+    "sequence_type": "T1w",
+    "acquisition_date": "2025-04-12T14:10:00Z",
+    "bids_metadata": {
+      "bids_version": "1.9.0",
+      "relative_path": "sub-ENU001/ses-01/anat/sub-ENU001_ses-01_T1w.nii.gz",
+      "format": "NIfTI-1/gzip",
+      "checksum_sha256": "9b1e1e2d78d94baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe377cc",
+      "file_size_bytes": 23800450
+    },
+    "scanner_hardware": {
+      "vendor": "GE Healthcare",
+      "model": "Optima MR450w",
+      "magnetic_field_tesla": 1.5,
+      "gradient_strength_mt_m": 33.0,
+      "receive_coil": "16-Channel Head Array",
+      "software_version": "DV26.0"
+    },
+    "acquisition_parameters": {
+      "pulse_sequence_name": "bravo_3d_ax",
+      "repetition_time_ms": 2500.0,
+      "echo_time_ms": 3.20,
+      "inversion_time_ms": 950.0,
+      "flip_angle_deg": 10.0,
+      "voxel_size_mm": { "x": 1.0, "y": 1.0, "z": 1.2 },
+      "matrix_size": { "read": 240, "phase": 240, "slices": 156 }
+    },
+    "clinical_profile": {
+      "diagnosis_category": "Healthy Control",
+      "condition_name": "Healthy Control Benchmark",
+      "severity": "Not Applicable",
+      "birth_year": 1985,
+      "biological_sex": "Female"
+    }
+  },
+  {
+    "scan_id": "SCN-ZAR-001-T1",
+    "participant_id": "ANRDMS-ZAR-001",
+    "site_id": "SITE-ZAR-01",
+    "hospital_name": "Ahmadu Bello University Teaching Hospital",
+    "session_id": "ses-01",
+    "modality": "MRI",
+    "sequence_type": "T1w",
+    "acquisition_date": "2025-05-18T09:00:00Z",
+    "bids_metadata": {
+      "bids_version": "1.9.0",
+      "relative_path": "sub-ZAR001/ses-01/anat/sub-ZAR001_ses-01_T1w.nii.gz",
+      "format": "NIfTI-1/gzip",
+      "checksum_sha256": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
+      "file_size_bytes": 22100400
+    },
+    "scanner_hardware": {
+      "vendor": "Neusoft Medical",
+      "model": "SuperOpen 0.3T",
+      "magnetic_field_tesla": 0.3,
+      "gradient_strength_mt_m": 18.0,
+      "receive_coil": "Open Permanent Head Coil",
+      "software_version": "NeuMR V3.1"
+    },
+    "acquisition_parameters": {
+      "pulse_sequence_name": "t1_fl2d_se",
+      "repetition_time_ms": 650.0,
+      "echo_time_ms": 16.0,
+      "flip_angle_deg": 90.0,
+      "voxel_size_mm": { "x": 1.2, "y": 1.2, "z": 4.0 },
+      "matrix_size": { "read": 256, "phase": 192, "slices": 24 }
+    },
+    "clinical_profile": {
+      "diagnosis_category": "Healthy Control",
+      "condition_name": "Healthy Control Benchmark",
+      "severity": "Not Applicable",
+      "birth_year": 1978,
+      "biological_sex": "Male"
+    }
+  }
+]

@@ -1,0 +1,74 @@
+============================================================================
+ANRDMS NOSQL DOCUMENT MODEL & AGGREGATION PIPELINE SUITE
+Execution Timestamp: 2026-11-14 21:01:55
+Data Model: MongoDB BSON / BIDS Document Specification v1.9.0
+============================================================================
+
+[*] Loading BIDS scan documents from: /Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-4-nosql/documents/scans_bids.json
+    Loaded 8 BIDS scan metadata documents.
+[*] Loading pipeline metrics documents from: /Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-4-nosql/documents/pipeline_metrics.json
+    Loaded 4 hierarchical computational metrics documents.
+
+============================================================================
+STAGE 1: DOCUMENT SCHEMA VALIDATION ($jsonSchema COMPLIANCE)
+============================================================================
+[+] Verified 8/8 scans strictly satisfy the BIDS $jsonSchema validation rules.
+    Enforced constraints: Primary key pattern, BIDS hierarchy, magnetic field range [0.2T, 7.5T].
+
+============================================================================
+PIPELINE 1: SUBCORTICAL VOLUMETRIC ATROPHY ACROSS CLINICAL COHORTS
+Equivalent MongoDB Pipeline: $match -> $group -> $project -> $sort
+============================================================================
+Clinical Condition                  | N   | L Hippo (mm³)  | R Hippo (mm³)  | Total Hippo  | Ventricles (mm³)
+---------------------------------------------------------------------------------------------------------
+Early-onset Alzheimer's dementia    | 1   | 3120.4         | 3210.1         | 6330.5       | 58400.0         
+Acute ischemic stroke               | 1   | 4150.2         | 4210.8         | 8361.0       | 32890.6         
+Healthy Control Benchmark           | 1   | 4480.0         | 4550.0         | 9030.0       | 24100.0         
+
+--> Clinical Finding: Alzheimer's cohort exhibits profound bilateral hippocampal volume reduction (6,330.5 mm³ vs 9,030.0 mm³ in Controls) with compensatory ventricular enlargement (58,400 mm³ vs 24,100 mm³).
+
+============================================================================
+PIPELINE 2: REGIONAL CORTICAL THINNING VIA $unwind & GROUPING
+Equivalent MongoDB Pipeline: $unwind: '$cortical_parcellations' -> $match -> $group
+============================================================================
+Anatomical Region    | Clinical Condition                  | Hemi (N) | Mean (mm)  | Range [Min - Max] 
+----------------------------------------------------------------------------------------------------
+entorhinal           | Early-onset Alzheimer's dementia    | 2        | 2.665      | [2.65 - 2.68]
+entorhinal           | Acute ischemic stroke               | 2        | 3.435      | [3.42 - 3.45]
+entorhinal           | Healthy Control Benchmark           | 2        | 3.565      | [3.55 - 3.58]
+superiorfrontal      | Early-onset Alzheimer's dementia    | 2        | 2.39       | [2.38 - 2.4]
+superiorfrontal      | Acute ischemic stroke               | 2        | 2.77       | [2.76 - 2.78]
+superiorfrontal      | Healthy Control Benchmark           | 2        | 2.835      | [2.82 - 2.85]
+
+--> Neuropathological Finding: Entorhinal cortex in early Alzheimer's exhibits pronounced cortical thinning (2.665 mm vs 3.565 mm in Controls, ~25.2% reduction).
+
+============================================================================
+PIPELINE 3: HARDWARE & HIGH-DIMENSIONAL BIDS ACQUISITION MATCHING
+Target: Scans on >=3.0T scanners with multi-shell dMRI b-values containing 2000
+============================================================================
+Scan ID          | Subject ID       | Site         | Scanner            | Field  | Directions | b-Shells        
+---------------------------------------------------------------------------------------------------------
+SCN-LOS-001-DM   | ANRDMS-LOS-001   | SITE-LOS-01  | Magnetom Skyra     | 3.0T   | 64         | [0, 1000, 2000] 
+
+--> Storage Model Evaluation: Relational modeling of multi-dimensional gradient tables requires separate join tables or serialized strings. Document stores preserve native arrays and multi-shell schemas without relational friction.
+
+============================================================================
+PIPELINE 4: MULTI-STAGE $facet DUAL-BRANCH ANALYTICS DASHBOARD
+Branch A: HPC Cluster Compute Resource Usage | Branch B: Topological Surface Quality
+============================================================================
+--- FACET 1: HPC Cluster Computational Profile by Pipeline ---
+Pipeline        | Jobs Run | Avg Runtime (Hours)    | Avg Peak RAM (GB) 
+----------------------------------------------------------------------
+FreeSurfer      | 3        | 7.45                   | 11.62             
+FSL-TBSS        | 1        | 3.94                   | 8.20              
+
+--- FACET 2: FreeSurfer Topological Surface Quality (Euler Numbers & Defects) ---
+Clinical Condition                  | Avg LH Euler   | Avg RH Euler   | Repaired Holes   | Avg CNR 
+-----------------------------------------------------------------------------------------------
+Acute ischemic stroke               | -2             | -4             | 3                | 8.42    
+Early-onset Alzheimer's dementia    | -8             | -10            | 9                | 7.15    
+Healthy Control Benchmark           | 0              | -2             | 1                | 8.95    
+
+============================================================================
+NOSQL DEMONSTRATION SUITE COMPLETED SUCCESSFULLY: ALL 5 PIPELINES VERIFIED
+============================================================================

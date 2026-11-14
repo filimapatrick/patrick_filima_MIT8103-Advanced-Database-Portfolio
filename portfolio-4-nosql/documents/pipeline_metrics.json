@@ -1,0 +1,301 @@
+[
+  {
+    "metric_id": "MET-FS-LOS-001",
+    "scan_id": "SCN-LOS-001-T1",
+    "participant_id": "ANRDMS-LOS-001",
+    "pipeline_info": {
+      "pipeline_name": "FreeSurfer",
+      "version": "7.4.1",
+      "container_image": "docker://freesurfer/freesurfer:7.4.1",
+      "recon_script": "recon-all -all -s sub-LOS001"
+    },
+    "execution_metrics": {
+      "compute_node": "hpc-node-01.luth.edu.ng",
+      "runtime_seconds": 26840,
+      "peak_ram_mb": 11840,
+      "cpu_cores_utilized": 8,
+      "exit_code": 0
+    },
+    "whole_brain_morphometry": {
+      "estimated_total_intracranial_volume_mm3": 1492040.5,
+      "brain_parenchyma_volume_mm3": 1210450.2,
+      "total_gray_matter_volume_mm3": 694210.8,
+      "total_cortical_white_matter_volume_mm3": 516239.4,
+      "subcortical_gray_matter_volume_mm3": 62450.1,
+      "ventricular_system_volume_mm3": 32890.6
+    },
+    "subcortical_structures": {
+      "left_hippocampus_mm3": 4150.2,
+      "right_hippocampus_mm3": 4210.8,
+      "left_amygdala_mm3": 1640.1,
+      "right_amygdala_mm3": 1680.4,
+      "left_thalamus_mm3": 7910.5,
+      "right_thalamus_mm3": 8020.1,
+      "left_caudate_mm3": 3840.2,
+      "right_caudate_mm3": 3910.6
+    },
+    "cortical_parcellations": [
+      {
+        "region_name": "superiorfrontal",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 2.76,
+        "surface_area_mm2": 7180.0,
+        "gray_matter_volume_mm3": 22140.0,
+        "mean_curvature": 0.128
+      },
+      {
+        "region_name": "superiorfrontal",
+        "hemisphere": "rh",
+        "mean_thickness_mm": 2.78,
+        "surface_area_mm2": 7240.0,
+        "gray_matter_volume_mm3": 22450.0,
+        "mean_curvature": 0.126
+      },
+      {
+        "region_name": "entorhinal",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 3.42,
+        "surface_area_mm2": 450.0,
+        "gray_matter_volume_mm3": 1820.0,
+        "mean_curvature": 0.104
+      },
+      {
+        "region_name": "entorhinal",
+        "hemisphere": "rh",
+        "mean_thickness_mm": 3.45,
+        "surface_area_mm2": 460.0,
+        "gray_matter_volume_mm3": 1850.0,
+        "mean_curvature": 0.102
+      },
+      {
+        "region_name": "precuneus",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 2.45,
+        "surface_area_mm2": 4120.0,
+        "gray_matter_volume_mm3": 11540.0,
+        "mean_curvature": 0.134
+      }
+    ],
+    "quality_metrics": {
+      "euler_number_lh": -2,
+      "euler_number_rh": -4,
+      "surface_holes_repaired_count": 3,
+      "contrast_to_noise_ratio": 8.42
+    },
+    "clinical_cohort": {
+      "diagnosis_category": "Cerebrovascular",
+      "condition_name": "Acute ischemic stroke"
+    }
+  },
+  {
+    "metric_id": "MET-FS-ABJ-001",
+    "scan_id": "SCN-ABJ-001-T1",
+    "participant_id": "ANRDMS-ABJ-001",
+    "pipeline_info": {
+      "pipeline_name": "FreeSurfer",
+      "version": "7.4.1",
+      "container_image": "docker://freesurfer/freesurfer:7.4.1",
+      "recon_script": "recon-all -all -s sub-ABJ001"
+    },
+    "execution_metrics": {
+      "compute_node": "hpc-node-02.nha.gov.ng",
+      "runtime_seconds": 29410,
+      "peak_ram_mb": 12650,
+      "cpu_cores_utilized": 8,
+      "exit_code": 0
+    },
+    "whole_brain_morphometry": {
+      "estimated_total_intracranial_volume_mm3": 1410200.0,
+      "brain_parenchyma_volume_mm3": 1084200.5,
+      "total_gray_matter_volume_mm3": 589400.2,
+      "total_cortical_white_matter_volume_mm3": 494800.3,
+      "subcortical_gray_matter_volume_mm3": 51200.0,
+      "ventricular_system_volume_mm3": 58400.0
+    },
+    "subcortical_structures": {
+      "left_hippocampus_mm3": 3120.4,
+      "right_hippocampus_mm3": 3210.1,
+      "left_amygdala_mm3": 1340.2,
+      "right_amygdala_mm3": 1380.0,
+      "left_thalamus_mm3": 6920.0,
+      "right_thalamus_mm3": 7010.5,
+      "left_caudate_mm3": 3210.0,
+      "right_caudate_mm3": 3300.0
+    },
+    "cortical_parcellations": [
+      {
+        "region_name": "superiorfrontal",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 2.38,
+        "surface_area_mm2": 6820.0,
+        "gray_matter_volume_mm3": 19400.0,
+        "mean_curvature": 0.138
+      },
+      {
+        "region_name": "superiorfrontal",
+        "hemisphere": "rh",
+        "mean_thickness_mm": 2.40,
+        "surface_area_mm2": 6890.0,
+        "gray_matter_volume_mm3": 19800.0,
+        "mean_curvature": 0.136
+      },
+      {
+        "region_name": "entorhinal",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 2.65,
+        "surface_area_mm2": 380.0,
+        "gray_matter_volume_mm3": 1210.0,
+        "mean_curvature": 0.118
+      },
+      {
+        "region_name": "entorhinal",
+        "hemisphere": "rh",
+        "mean_thickness_mm": 2.68,
+        "surface_area_mm2": 390.0,
+        "gray_matter_volume_mm3": 1240.0,
+        "mean_curvature": 0.116
+      },
+      {
+        "region_name": "precuneus",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 2.15,
+        "surface_area_mm2": 3810.0,
+        "gray_matter_volume_mm3": 9820.0,
+        "mean_curvature": 0.146
+      }
+    ],
+    "quality_metrics": {
+      "euler_number_lh": -8,
+      "euler_number_rh": -10,
+      "surface_holes_repaired_count": 9,
+      "contrast_to_noise_ratio": 7.15
+    },
+    "clinical_cohort": {
+      "diagnosis_category": "Neurodegenerative",
+      "condition_name": "Early-onset Alzheimer's dementia"
+    }
+  },
+  {
+    "metric_id": "MET-FS-ENU-001",
+    "scan_id": "SCN-ENU-001-T1",
+    "participant_id": "ANRDMS-ENU-001",
+    "pipeline_info": {
+      "pipeline_name": "FreeSurfer",
+      "version": "7.4.1",
+      "container_image": "docker://freesurfer/freesurfer:7.4.1",
+      "recon_script": "recon-all -all -s sub-ENU001"
+    },
+    "execution_metrics": {
+      "compute_node": "hpc-node-03.unth.edu.ng",
+      "runtime_seconds": 24200,
+      "peak_ram_mb": 11200,
+      "cpu_cores_utilized": 8,
+      "exit_code": 0
+    },
+    "whole_brain_morphometry": {
+      "estimated_total_intracranial_volume_mm3": 1520100.0,
+      "brain_parenchyma_volume_mm3": 1290400.0,
+      "total_gray_matter_volume_mm3": 745100.0,
+      "total_cortical_white_matter_volume_mm3": 545300.0,
+      "subcortical_gray_matter_volume_mm3": 68900.0,
+      "ventricular_system_volume_mm3": 24100.0
+    },
+    "subcortical_structures": {
+      "left_hippocampus_mm3": 4480.0,
+      "right_hippocampus_mm3": 4550.0,
+      "left_amygdala_mm3": 1780.0,
+      "right_amygdala_mm3": 1810.0,
+      "left_thalamus_mm3": 8340.0,
+      "right_thalamus_mm3": 8410.0,
+      "left_caudate_mm3": 4120.0,
+      "right_caudate_mm3": 4190.0
+    },
+    "cortical_parcellations": [
+      {
+        "region_name": "superiorfrontal",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 2.82,
+        "surface_area_mm2": 7410.0,
+        "gray_matter_volume_mm3": 23410.0,
+        "mean_curvature": 0.124
+      },
+      {
+        "region_name": "superiorfrontal",
+        "hemisphere": "rh",
+        "mean_thickness_mm": 2.85,
+        "surface_area_mm2": 7490.0,
+        "gray_matter_volume_mm3": 23780.0,
+        "mean_curvature": 0.122
+      },
+      {
+        "region_name": "entorhinal",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 3.55,
+        "surface_area_mm2": 480.0,
+        "gray_matter_volume_mm3": 1940.0,
+        "mean_curvature": 0.101
+      },
+      {
+        "region_name": "entorhinal",
+        "hemisphere": "rh",
+        "mean_thickness_mm": 3.58,
+        "surface_area_mm2": 490.0,
+        "gray_matter_volume_mm3": 1970.0,
+        "mean_curvature": 0.099
+      },
+      {
+        "region_name": "precuneus",
+        "hemisphere": "lh",
+        "mean_thickness_mm": 2.52,
+        "surface_area_mm2": 4290.0,
+        "gray_matter_volume_mm3": 12210.0,
+        "mean_curvature": 0.130
+      }
+    ],
+    "quality_metrics": {
+      "euler_number_lh": 0,
+      "euler_number_rh": -2,
+      "surface_holes_repaired_count": 1,
+      "contrast_to_noise_ratio": 8.95
+    },
+    "clinical_cohort": {
+      "diagnosis_category": "Healthy Control",
+      "condition_name": "Healthy Control Benchmark"
+    }
+  },
+  {
+    "metric_id": "MET-TBSS-LOS-001",
+    "scan_id": "SCN-LOS-001-DM",
+    "participant_id": "ANRDMS-LOS-001",
+    "pipeline_info": {
+      "pipeline_name": "FSL-TBSS",
+      "version": "6.0.7",
+      "container_image": "docker://brainlife/fsl:6.0.7",
+      "recon_script": "tbss_1_preproc *.nii.gz && tbss_2_reg -T && tbss_3_postreg -S"
+    },
+    "execution_metrics": {
+      "compute_node": "hpc-node-01.luth.edu.ng",
+      "runtime_seconds": 14200,
+      "peak_ram_mb": 8400,
+      "cpu_cores_utilized": 4,
+      "exit_code": 0
+    },
+    "tract_based_spatial_statistics": {
+      "global_mean_fractional_anisotropy": 0.442,
+      "global_mean_diffusivity_x10_3": 0.785,
+      "tract_fa_means": {
+        "corpus_callosum_genu": 0.782,
+        "corpus_callosum_body": 0.745,
+        "corpus_callosum_splenium": 0.812,
+        "corticospinal_tract_left": 0.612,
+        "corticospinal_tract_right": 0.698,
+        "internal_capsule_anterior_limb": 0.655,
+        "superior_longitudinal_fasciculus": 0.589
+      }
+    },
+    "clinical_cohort": {
+      "diagnosis_category": "Cerebrovascular",
+      "condition_name": "Acute ischemic stroke"
+    }
+  }
+]
