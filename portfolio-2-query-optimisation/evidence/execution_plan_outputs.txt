@@ -1,0 +1,182 @@
+Timing is on.
+DROP INDEX
+Time: 4.007 ms
+psql:/Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-2-query-optimisation/execution_plans.sql:24: NOTICE:  index "idx_qc_pass_usable_partial" does not exist, skipping
+DROP INDEX
+Time: 0.133 ms
+psql:/Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-2-query-optimisation/execution_plans.sql:25: NOTICE:  index "idx_jobs_completed_scan_partial" does not exist, skipping
+DROP INDEX
+Time: 0.049 ms
+DROP INDEX
+Time: 2.094 ms
+DROP INDEX
+Time: 1.149 ms
+ANALYZE
+Time: 692.557 ms
+ANALYZE
+Time: 186.354 ms
+ANALYZE
+Time: 359.893 ms
+======================================================================
+BASELINE EXPERIMENT 1: Temporal Sequence Filtering (Without Index)
+Expected Plan: Full Table Scan (Seq Scan) + In-Memory Sort
+======================================================================
+                                                                                                       QUERY PLAN                                                                                                       
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=5109.91..5115.81 rows=2361 width=51) (actual time=10.213..10.257 rows=2350 loops=1)
+   Sort Key: acquisition_date DESC
+   Sort Method: quicksort  Memory: 298kB
+   Buffers: shared hit=3227
+   ->  Seq Scan on mri_scans  (cost=0.00..4977.63 rows=2361 width=51) (actual time=0.005..9.960 rows=2350 loops=1)
+         Filter: ((acquisition_date >= '2024-12-31 23:00:00+00'::timestamp with time zone) AND (acquisition_date < '2025-07-01 00:00:00+01'::timestamp with time zone) AND ((sequence_type)::text = 'fMRI-rest'::text))
+         Rows Removed by Filter: 97686
+         Buffers: shared hit=3227
+ Planning:
+   Buffers: shared hit=58
+ Planning Time: 0.123 ms
+ Execution Time: 10.314 ms
+(12 rows)
+
+Time: 11.320 ms
+======================================================================
+BASELINE EXPERIMENT 2: Quality-Certified Cohort Retrieval (Without Index)
+Expected Plan: Hash Join with Sequential Scans over 100k + 70k rows
+======================================================================
+                                                            QUERY PLAN                                                             
+-----------------------------------------------------------------------------------------------------------------------------------
+ Hash Semi Join  (cost=2611.45..7320.13 rows=12925 width=43) (actual time=7.370..20.377 rows=23343 loops=1)
+   Hash Cond: ((ms.scan_id)::text = (qc.scan_id)::text)
+   Buffers: shared hit=4478
+   ->  Seq Scan on mri_scans ms  (cost=0.00..4477.45 rows=33309 width=43) (actual time=0.002..9.751 rows=33358 loops=1)
+         Filter: ((sequence_type)::text = 'T1w'::text)
+         Rows Removed by Filter: 66678
+         Buffers: shared hit=3227
+   ->  Hash  (cost=2126.25..2126.25 rows=38816 width=15) (actual time=7.361..7.362 rows=46683 loops=1)
+         Buckets: 65536  Batches: 1  Memory Usage: 2655kB
+         Buffers: shared hit=1251
+         ->  Seq Scan on qc_evaluations qc  (cost=0.00..2126.25 rows=38816 width=15) (actual time=0.001..4.859 rows=46683 loops=1)
+               Filter: (usable_for_analysis AND ((overall_quality)::text = 'PASS'::text))
+               Rows Removed by Filter: 23337
+               Buffers: shared hit=1251
+ Planning:
+   Buffers: shared hit=96
+ Planning Time: 0.216 ms
+ Execution Time: 20.822 ms
+(18 rows)
+
+Time: 21.193 ms
+======================================================================
+BASELINE EXPERIMENT 3: Pipeline Backlog Anti-Join (Without Index)
+Expected Plan: Hash Anti Join with Full Sequential Scans
+======================================================================
+                                                             QUERY PLAN                                                             
+------------------------------------------------------------------------------------------------------------------------------------
+ Hash Anti Join  (cost=3367.56..8412.51 rows=49854 width=43) (actual time=8.722..24.751 rows=50016 loops=1)
+   Hash Cond: ((ms.scan_id)::text = (pj.scan_id)::text)
+   Buffers: shared hit=4967
+   ->  Seq Scan on mri_scans ms  (cost=0.00..4227.36 rows=100036 width=43) (actual time=0.002..3.182 rows=100036 loops=1)
+         Buffers: shared hit=3227
+   ->  Hash  (cost=2740.29..2740.29 rows=50182 width=15) (actual time=8.713..8.713 rows=50020 loops=1)
+         Buckets: 65536  Batches: 1  Memory Usage: 2808kB
+         Buffers: shared hit=1740
+         ->  Seq Scan on processing_jobs pj  (cost=0.00..2740.29 rows=50182 width=15) (actual time=0.002..6.008 rows=50020 loops=1)
+               Filter: ((status)::text = 'COMPLETED'::text)
+               Rows Removed by Filter: 30003
+               Buffers: shared hit=1740
+ Planning:
+   Buffers: shared hit=26
+ Planning Time: 0.128 ms
+ Execution Time: 25.686 ms
+(16 rows)
+
+Time: 25.932 ms
+======================================================================
+CREATING TARGETED OPTIMIZATION INDEXES
+======================================================================
+CREATE INDEX
+Time: 70.350 ms
+CREATE INDEX
+Time: 127.834 ms
+CREATE INDEX
+Time: 129.671 ms
+ANALYZE
+Time: 659.746 ms
+ANALYZE
+Time: 163.771 ms
+ANALYZE
+Time: 341.463 ms
+======================================================================
+OPTIMIZED EXPERIMENT 1: Temporal Sequence Filtering (With Composite Index)
+Expected Plan: Index Scan / Bitmap Index Scan, Sort Eliminated
+======================================================================
+                                                                                                            QUERY PLAN                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=3355.36..3361.22 rows=2344 width=51) (actual time=1.199..1.243 rows=2350 loops=1)
+   Sort Key: acquisition_date DESC
+   Sort Method: quicksort  Memory: 298kB
+   Buffers: shared hit=456 read=14
+   ->  Bitmap Heap Scan on mri_scans  (cost=70.30..3224.16 rows=2344 width=51) (actual time=0.446..0.956 rows=2350 loops=1)
+         Recheck Cond: (((sequence_type)::text = 'fMRI-rest'::text) AND (acquisition_date >= '2024-12-31 23:00:00+00'::timestamp with time zone) AND (acquisition_date < '2025-07-01 00:00:00+01'::timestamp with time zone))
+         Heap Blocks: exact=456
+         Buffers: shared hit=456 read=14
+         ->  Bitmap Index Scan on idx_scans_seq_date  (cost=0.00..69.72 rows=2344 width=0) (actual time=0.420..0.420 rows=2350 loops=1)
+               Index Cond: (((sequence_type)::text = 'fMRI-rest'::text) AND (acquisition_date >= '2024-12-31 23:00:00+00'::timestamp with time zone) AND (acquisition_date < '2025-07-01 00:00:00+01'::timestamp with time zone))
+               Buffers: shared read=14
+ Planning:
+   Buffers: shared hit=27 read=1
+ Planning Time: 0.077 ms
+ Execution Time: 1.298 ms
+(15 rows)
+
+Time: 1.480 ms
+======================================================================
+OPTIMIZED EXPERIMENT 2: Quality-Certified Cohort Retrieval (With Partial Index)
+Expected Plan: Index Semi Join / Nested Loop using Partial Index
+======================================================================
+                                                                                QUERY PLAN                                                                                 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Hash Semi Join  (cost=1683.51..6392.40 rows=12972 width=43) (actual time=4.541..17.662 rows=23343 loops=1)
+   Hash Cond: ((ms.scan_id)::text = (qc.scan_id)::text)
+   Buffers: shared hit=3228 read=180
+   ->  Seq Scan on mri_scans ms  (cost=0.00..4477.45 rows=33189 width=43) (actual time=0.002..9.964 rows=33358 loops=1)
+         Filter: ((sequence_type)::text = 'T1w'::text)
+         Rows Removed by Filter: 66678
+         Buffers: shared hit=3227
+   ->  Hash  (cost=1194.78..1194.78 rows=39099 width=15) (actual time=4.533..4.533 rows=46683 loops=1)
+         Buckets: 65536  Batches: 1  Memory Usage: 2655kB
+         Buffers: shared hit=1 read=180
+         ->  Index Only Scan using idx_qc_pass_usable_partial on qc_evaluations qc  (cost=0.29..1194.78 rows=39099 width=15) (actual time=0.008..1.893 rows=46683 loops=1)
+               Heap Fetches: 0
+               Buffers: shared hit=1 read=180
+ Planning:
+   Buffers: shared hit=46 read=1
+ Planning Time: 0.181 ms
+ Execution Time: 18.100 ms
+(17 rows)
+
+Time: 18.408 ms
+======================================================================
+OPTIMIZED EXPERIMENT 3: Pipeline Backlog Anti-Join (With Partial Index)
+Expected Plan: Accelerated Anti-Join via Partial Index Scan
+======================================================================
+                                                                                   QUERY PLAN                                                                                    
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Hash Anti Join  (cost=2151.98..7198.32 rows=50011 width=43) (actual time=4.637..20.252 rows=50016 loops=1)
+   Hash Cond: ((ms.scan_id)::text = (pj.scan_id)::text)
+   Buffers: shared hit=3228 read=193
+   ->  Seq Scan on mri_scans ms  (cost=0.00..4227.36 rows=100036 width=43) (actual time=0.002..3.141 rows=100036 loops=1)
+         Buffers: shared hit=3227
+   ->  Hash  (cost=1526.66..1526.66 rows=50025 width=15) (actual time=4.629..4.629 rows=50020 loops=1)
+         Buckets: 65536  Batches: 1  Memory Usage: 2808kB
+         Buffers: shared hit=1 read=193
+         ->  Index Only Scan using idx_jobs_completed_scan_partial on processing_jobs pj  (cost=0.29..1526.66 rows=50025 width=15) (actual time=0.009..1.956 rows=50020 loops=1)
+               Heap Fetches: 0
+               Buffers: shared hit=1 read=193
+ Planning:
+   Buffers: shared hit=29 read=1
+ Planning Time: 0.205 ms
+ Execution Time: 21.183 ms
+(15 rows)
+
+Time: 21.520 ms
+Timing is off.

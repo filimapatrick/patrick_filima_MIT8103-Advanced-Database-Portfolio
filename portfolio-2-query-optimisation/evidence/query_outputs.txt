@@ -1,0 +1,106 @@
+   site_id   |                   hospital_name                   | total_scans 
+-------------+---------------------------------------------------+-------------
+ SITE-LOS-01 | Lagos University Teaching Hospital (LUTH)         |           9
+ SITE-ABJ-01 | National Hospital Abuja (NHA)                     |           8
+ SITE-IBD-01 | University College Hospital (UCH)                 |           7
+ SITE-ZAR-01 | Ahmadu Bello University Teaching Hospital (ABUTH) |           6
+ SITE-ENU-01 | University of Nigeria Teaching Hospital (UNTH)    |           6
+(5 rows)
+
+                  condition_name                   |      category       | total_participants 
+---------------------------------------------------+---------------------+--------------------
+ Cognitively Unimpaired Healthy Control            | Healthy Control     |                  7
+ Acute Ischemic Stroke                             | Cerebrovascular     |                  5
+ Temporal Lobe Epilepsy with Hippocampal Sclerosis | Epilepsy & Seizures |                  4
+ Vascular Dementia                                 | Neurodegenerative   |                  3
+ Early-Onset Alzheimer's Dementia                  | Neurodegenerative   |                  3
+ Idiopathic Parkinson's Disease                    | Neurodegenerative   |                  2
+ Intracerebral Hemorrhage                          | Cerebrovascular     |                  1
+(7 rows)
+
+    scan_id     | participant_id | sequence_type |                   hospital_name                   |    acquisition_date    
+----------------+----------------+---------------+---------------------------------------------------+------------------------
+ SCN-ABJ-003-T1 | ANRDMS-ABJ-003 | T1w           | National Hospital Abuja (NHA)                     | 2025-03-16 12:30:00+00
+ SCN-ENU-002-T1 | ANRDMS-ENU-002 | T1w           | University of Nigeria Teaching Hospital (UNTH)    | 2025-03-14 10:15:00+00
+ SCN-ZAR-001-T1 | ANRDMS-ZAR-001 | T1w           | Ahmadu Bello University Teaching Hospital (ABUTH) | 2025-03-08 08:15:00+00
+ SCN-LOS-003-T1 | ANRDMS-LOS-003 | T1w           | Lagos University Teaching Hospital (LUTH)         | 2025-03-05 13:00:00+00
+ SCN-ABJ-002-T1 | ANRDMS-ABJ-002 | T1w           | National Hospital Abuja (NHA)                     | 2025-03-02 09:00:00+00
+ SCN-ABJ-001-T1 | ANRDMS-ABJ-001 | T1w           | National Hospital Abuja (NHA)                     | 2025-02-25 07:30:00+00
+ SCN-LOS-002-T1 | ANRDMS-LOS-002 | T1w           | Lagos University Teaching Hospital (LUTH)         | 2025-02-20 10:15:00+00
+ SCN-ENU-001-T1 | ANRDMS-ENU-001 | T1w           | University of Nigeria Teaching Hospital (UNTH)    | 2025-02-18 09:30:00+00
+ SCN-LOS-001-T1 | ANRDMS-LOS-001 | T1w           | Lagos University Teaching Hospital (LUTH)         | 2025-02-14 08:30:00+00
+ SCN-IBD-001-T1 | ANRDMS-IBD-001 | T1w           | University College Hospital (UCH)                 | 2025-01-28 09:10:00+00
+(10 rows)
+
+   pipeline_id   |                name                | version | total_jobs | failed_jobs | completed_or_failed_jobs | failure_rate_percent 
+-----------------+------------------------------------+---------+------------+-------------+--------------------------+----------------------
+ PIP-FS-741      | FreeSurfer Cortical Reconstruction | 7.4.1   |         16 |           1 |                       14 |                 7.14
+ PIP-QSIPREP-020 | QSIPrep Diffusion Preprocessing    | 0.20.0  |          3 |           0 |                        3 |                 0.00
+ PIP-FLAIR-WML   | BIANCA White Matter Lesion Tool    | 1.2.0   |          2 |           0 |                        2 |                 0.00
+ PIP-FMRIPREP-23 | fMRIPrep BIDS Pipeline             | 23.2.0  |          2 |           0 |                        2 |                 0.00
+ PIP-FSL-607     | FSL Brain Extraction & FEAT        | 6.0.7   |          0 |           0 |                        0 |                     
+(5 rows)
+
+ participant_id | sequence_count | available_sequences 
+----------------+----------------+---------------------
+ ANRDMS-LOS-001 |              3 | dMRI, FLAIR, T1w
+ ANRDMS-ABJ-002 |              2 | FLAIR, T1w
+ ANRDMS-ABJ-003 |              2 | fMRI-rest, T1w
+ ANRDMS-ENU-001 |              2 | FLAIR, T1w
+ ANRDMS-IBD-001 |              2 | FLAIR, T1w
+ ANRDMS-IBD-002 |              2 | dMRI, T1w
+ ANRDMS-LOS-002 |              2 | FLAIR, T1w
+ ANRDMS-LOS-003 |              2 | fMRI-rest, T1w
+ ANRDMS-ABJ-001 |              2 | dMRI, T1w
+ ANRDMS-ZAR-002 |              2 | FLAIR, T1w
+(10 rows)
+
+    scan_id     | participant_id | sequence_type |    acquisition_date    
+----------------+----------------+---------------+------------------------
+ SCN-ZAR-005-T1 | ANRDMS-ZAR-005 | T1w           | 2025-06-25 14:40:00+01
+ SCN-ENU-005-T1 | ANRDMS-ENU-005 | T1w           | 2025-06-20 15:30:00+01
+ SCN-IBD-005-T1 | ANRDMS-IBD-005 | T1w           | 2025-05-28 16:00:00+01
+ SCN-ABJ-005-T1 | ANRDMS-ABJ-005 | T1w           | 2025-05-22 15:10:00+01
+ SCN-ZAR-004-T1 | ANRDMS-ZAR-004 | T1w           | 2025-05-12 10:15:00+01
+ SCN-ENU-004-T1 | ANRDMS-ENU-004 | T1w           | 2025-05-08 12:40:00+01
+ SCN-IBD-004-T1 | ANRDMS-IBD-004 | T1w           | 2025-04-26 09:20:00+01
+ SCN-ZAR-003-T1 | ANRDMS-ZAR-003 | T1w           | 2025-04-22 13:00:00+01
+ SCN-LOS-005-T1 | ANRDMS-LOS-005 | T1w           | 2025-04-10 15:40:00+01
+ SCN-ENU-003-T1 | ANRDMS-ENU-003 | T1w           | 2025-04-10 14:00:00+01
+ SCN-ZAR-002-FL | ANRDMS-ZAR-002 | FLAIR         | 2025-04-02 11:45:00+01
+ SCN-ABJ-003-T1 | ANRDMS-ABJ-003 | T1w           | 2025-03-16 12:30:00+00
+ SCN-ABJ-002-FL | ANRDMS-ABJ-002 | FLAIR         | 2025-03-02 09:15:00+00
+ SCN-ENU-001-FL | ANRDMS-ENU-001 | FLAIR         | 2025-02-18 09:45:00+00
+ SCN-IBD-002-T1 | ANRDMS-IBD-002 | T1w           | 2025-02-12 10:45:00+00
+ SCN-IBD-001-FL | ANRDMS-IBD-001 | FLAIR         | 2025-01-28 09:25:00+00
+(16 rows)
+
+ participant_id |    scan_id     | sequence_type |    acquisition_date    
+----------------+----------------+---------------+------------------------
+ ANRDMS-ABJ-001 | SCN-ABJ-001-DM | dMRI          | 2025-02-25 07:48:00+00
+ ANRDMS-ABJ-002 | SCN-ABJ-002-FL | FLAIR         | 2025-03-02 09:15:00+00
+ ANRDMS-ABJ-003 | SCN-ABJ-003-FM | fMRI-rest     | 2025-03-16 12:50:00+00
+ ANRDMS-ABJ-004 | SCN-ABJ-004-T1 | T1w           | 2025-04-10 11:00:00+01
+ ANRDMS-ABJ-005 | SCN-ABJ-005-T1 | T1w           | 2025-05-22 15:10:00+01
+ ANRDMS-ENU-001 | SCN-ENU-001-FL | FLAIR         | 2025-02-18 09:45:00+00
+ ANRDMS-ENU-002 | SCN-ENU-002-T1 | T1w           | 2025-03-14 10:15:00+00
+ ANRDMS-ENU-003 | SCN-ENU-003-T1 | T1w           | 2025-04-10 14:00:00+01
+ ANRDMS-ENU-004 | SCN-ENU-004-T1 | T1w           | 2025-05-08 12:40:00+01
+ ANRDMS-ENU-005 | SCN-ENU-005-T1 | T1w           | 2025-06-20 15:30:00+01
+ ANRDMS-IBD-001 | SCN-IBD-001-FL | FLAIR         | 2025-01-28 09:25:00+00
+ ANRDMS-IBD-002 | SCN-IBD-002-DM | dMRI          | 2025-02-12 11:05:00+00
+ ANRDMS-IBD-003 | SCN-IBD-003-T1 | T1w           | 2025-03-24 13:15:00+00
+ ANRDMS-IBD-004 | SCN-IBD-004-T1 | T1w           | 2025-04-26 09:20:00+01
+ ANRDMS-IBD-005 | SCN-IBD-005-T1 | T1w           | 2025-05-28 16:00:00+01
+ ANRDMS-LOS-001 | SCN-LOS-001-DM | dMRI          | 2025-02-14 08:55:00+00
+ ANRDMS-LOS-002 | SCN-LOS-002-FL | FLAIR         | 2025-02-20 10:28:00+00
+ ANRDMS-LOS-003 | SCN-LOS-003-FM | fMRI-rest     | 2025-03-05 13:18:00+00
+ ANRDMS-LOS-004 | SCN-LOS-004-T1 | T1w           | 2025-03-18 09:20:00+00
+ ANRDMS-LOS-005 | SCN-LOS-005-T1 | T1w           | 2025-04-10 15:40:00+01
+ ANRDMS-ZAR-001 | SCN-ZAR-001-T1 | T1w           | 2025-03-08 08:15:00+00
+ ANRDMS-ZAR-002 | SCN-ZAR-002-FL | FLAIR         | 2025-04-02 11:45:00+01
+ ANRDMS-ZAR-003 | SCN-ZAR-003-T1 | T1w           | 2025-04-22 13:00:00+01
+ ANRDMS-ZAR-004 | SCN-ZAR-004-T1 | T1w           | 2025-05-12 10:15:00+01
+ ANRDMS-ZAR-005 | SCN-ZAR-005-T1 | T1w           | 2025-06-25 14:40:00+01
+(25 rows)
+
