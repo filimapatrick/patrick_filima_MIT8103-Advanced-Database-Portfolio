@@ -483,7 +483,12 @@ SELECT
 FROM participants
 WHERE participant_id = 'ANRDMS-LOS-006';
 
--- Step 4.4: Inspect Write-Ahead Log (WAL) current location and sequence
+-- Step 4.4: Inspect Write-Ahead Log (WAL) generation, write, flush locations, and durability parameters
+SHOW synchronous_commit;
+SHOW fsync;
+
 SELECT 
-    pg_current_wal_lsn() AS current_wal_flush_lsn,
+    pg_current_wal_insert_lsn() AS wal_insert_lsn,
+    pg_current_wal_lsn() AS wal_write_lsn,
+    pg_current_wal_flush_lsn() AS wal_flush_lsn,
     pg_walfile_name(pg_current_wal_lsn()) AS active_wal_segment_file;

@@ -1,141 +1,160 @@
-[2026-11-14 20:22:33] ============================================================================
-[2026-11-14 20:22:33] ANRDMS CONCURRENCY & TRANSACTION ISOLATION EMPIRICAL TEST SUITE
-[2026-11-14 20:22:33] PostgreSQL 16.16 - Dual Interactive Session Execution Transcript
-[2026-11-14 20:22:33] Database: anrdms | Host: localhost (/tmp/.s.PGSQL.5432)
-[2026-11-14 20:22:33] ============================================================================
+[2026-11-14 20:43:42] ============================================================================
+[2026-11-14 20:43:42] ANRDMS CONCURRENCY & TRANSACTION ISOLATION EMPIRICAL TEST SUITE
+[2026-11-14 20:43:42] PostgreSQL 16 - Portable Automated Dual-Session Verification Harness
+[2026-11-14 20:43:42] Database: anrdms_transactions | Host: /tmp | Client: /opt/homebrew/bin/psql
+[2026-11-14 20:43:42] ============================================================================
 
-[2026-11-14 20:22:34] --- INITIAL SETUP: Registering test jobs and baseline scanner states ---
-[2026-11-14 20:22:34] SETUP OUTPUT:
-DELETE 2
+[2026-11-14 20:43:43] --- INITIAL SETUP: Registering test jobs and baseline scanner states ---
+[2026-11-14 20:43:43] SETUP OUTPUT:
+DELETE 0
 INSERT 0 2
 UPDATE 2
 
-[2026-11-14 20:22:34] 
+[2026-11-14 20:43:43] 
 ============================================================================
-[2026-11-14 20:22:34] EXPERIMENT 1: PESSIMISTIC LOCKING & LOST UPDATE PREVENTION (FOR UPDATE)
-[2026-11-14 20:22:34] ============================================================================
-[2026-11-14 20:22:34] [Session 1] Step 1.1: Begin transaction and acquire row lock on Job 101
-[2026-11-14 20:22:35] Session 1: job_id |    scan_id     | pipeline_id | status  
+[2026-11-14 20:43:43] EXPERIMENT 1A: PESSIMISTIC LOCKING & LOST UPDATE PREVENTION (FOR UPDATE)
+[2026-11-14 20:43:43] ============================================================================
+[2026-11-14 20:43:43] [Session 1] Step 1A.1: Begin transaction and acquire row lock on Job 101
+[2026-11-14 20:43:44] Session 1: job_id |    scan_id     | pipeline_id | status  
 --------+----------------+-------------+---------
-    101 | SCN-LOS-006-T1 | PIP-FS-741  | PENDING
+    101 | SCN-LOS-001-T1 | PIP-FS-741  | PENDING
 (1 row)
-[2026-11-14 20:22:35] 
-[Session 2] Step 1.2: Concurrently attempt to acquire lock on the SAME Job 101
-[2026-11-14 20:22:36] Session 2 (Attempting lock): [BLOCKED - Session 2 is waiting for Session 1 to release tuple lock]
-[2026-11-14 20:22:36] 
-[Session 1] Step 1.3: Worker 1 marks Job 101 RUNNING and commits transaction
-[2026-11-14 20:22:37] Session 1: COMMIT (Released lock)
-[2026-11-14 20:22:37] 
-[Session 2] Step 1.4: Session 2 immediately unblocks post-commit
-[2026-11-14 20:22:37] Session 2 (Unblocked): job_id | scan_id | pipeline_id | status 
+[2026-11-14 20:43:44] 
+[Session 2] Step 1A.2: Concurrently attempt to acquire lock on the SAME Job 101
+[2026-11-14 20:43:45] Session 2 (Attempting lock): [BLOCKED - Session 2 is waiting for Session 1 to release tuple lock]
+[2026-11-14 20:43:45] 
+[Session 1] Step 1A.3: Worker 1 marks Job 101 RUNNING and commits transaction
+[2026-11-14 20:43:46] Session 1: COMMIT (Released lock)
+[2026-11-14 20:43:46] 
+[Session 2] Step 1A.4: Session 2 immediately unblocks post-commit
+[2026-11-14 20:43:46] Session 2 (Unblocked): job_id | scan_id | pipeline_id | status 
 --------+---------+-------------+--------
 (0 rows)
-[2026-11-14 20:22:38] Session 2: ROLLBACK
-[2026-11-14 20:22:38] 
+[2026-11-14 20:43:47] VERIFIED: Pessimistic locking serialized access; Session 2 safely received 0 qualifying rows without lost update.
+[2026-11-14 20:43:47] 
 ============================================================================
-[2026-11-14 20:22:38] EXPERIMENT 1B: NON-BLOCKING JOB DISPATCH QUEUE (FOR UPDATE SKIP LOCKED)
-[2026-11-14 20:22:38] ============================================================================
-[2026-11-14 20:22:38] [Session 1] Step 1B.1: Worker 1 claims first available test job with SKIP LOCKED
-[2026-11-14 20:22:39] Session 1: job_id | pipeline_id | status  
+[2026-11-14 20:43:47] EXPERIMENT 1B: NON-BLOCKING JOB DISPATCH QUEUE (FOR UPDATE SKIP LOCKED)
+[2026-11-14 20:43:47] ============================================================================
+[2026-11-14 20:43:47] [Session 1] Step 1B.1: Worker 1 claims first available test job with SKIP LOCKED
+[2026-11-14 20:43:48] Session 1: job_id | pipeline_id | status  
 --------+-------------+---------
     101 | PIP-FS-741  | PENDING
 (1 row)
-[2026-11-14 20:22:39] 
+[2026-11-14 20:43:48] 
 [Session 2] Step 1B.2: Worker 2 simultaneously claims available test job with SKIP LOCKED
-[2026-11-14 20:22:40] Session 2: job_id | pipeline_id | status  
+[2026-11-14 20:43:49] Session 2: job_id | pipeline_id | status  
 --------+-------------+---------
     102 | PIP-FSL-607 | PENDING
-(1 row) --> [NOTICE: Session 2 did NOT block; automatically skipped locked Job 101 and claimed Job 102!]
-[2026-11-14 20:22:41] Both workers committed their disjoint claimed jobs.
-[2026-11-14 20:22:41] 
+(1 row) --> [NOTICE: Session 2 did not wait; automatically skipped locked Job 101 and claimed Job 102!]
+[2026-11-14 20:43:49] VERIFIED: Both workers claimed disjoint jobs concurrently without contention.
+[2026-11-14 20:43:49] 
 ============================================================================
-[2026-11-14 20:22:41] EXPERIMENT 2A: NON-REPEATABLE READ ANOMALY UNDER READ COMMITTED
-[2026-11-14 20:22:41] ============================================================================
-[2026-11-14 20:22:41] [Session 1] Step 2A.1: Start transaction in READ COMMITTED and count running test jobs
-[2026-11-14 20:22:41] Session 1 (Query 1): running_test_jobs 
+[2026-11-14 20:43:49] EXPERIMENT 2A: NON-REPEATABLE READ ANOMALY UNDER READ COMMITTED
+[2026-11-14 20:43:49] ============================================================================
+[2026-11-14 20:43:49] [Session 1] Step 2A.1: Start transaction in READ COMMITTED and inspect Job 101
+[2026-11-14 20:43:51] Session 1 (Query 1 - Status): job_id | status  
+--------+---------
+    101 | RUNNING
+(1 row)
+[2026-11-14 20:43:51] Session 1 (Query 1 - Count):  running_test_jobs 
 -------------------
                  2
 (1 row)
-[2026-11-14 20:22:41] 
-[Session 2] Step 2A.2: Concurrent session completes job 101 and commits
-[2026-11-14 20:22:43] Session 2 (Commit completed job): COMMIT
-[2026-11-14 20:22:43] 
-[Session 1] Step 2A.3: Session 1 repeats identical query within the same transaction
-[2026-11-14 20:22:43] Session 1 (Query 2): running_test_jobs 
+[2026-11-14 20:43:51] 
+[Session 2] Step 2A.2: Concurrent session completes Job 101 and commits
+[2026-11-14 20:43:52] Session 2 (Commit completed job): COMMIT
+[2026-11-14 20:43:52] 
+[Session 1] Step 2A.3: Session 1 repeats identical queries within the same transaction
+[2026-11-14 20:43:53] Session 1 (Query 2 - Status): job_id |  status   
+--------+-----------
+    101 | COMPLETED
+(1 row) --> [Row-level status changed from RUNNING to COMPLETED!]
+[2026-11-14 20:43:53] Session 1 (Query 2 - Count):  running_test_jobs 
 -------------------
                  1
-(1 row) --> [ANOMALY OBSERVED: Non-Repeatable Read occurred! Count decreased from 2 to 1 in the same transaction]
-[2026-11-14 20:22:43] 
+(1 row) --> [Running count changed from 2 to 1!]
+[2026-11-14 20:43:53] VERIFIED: Non-Repeatable Read occurred under READ COMMITTED due to statement-level snapshot re-acquisition.
+[2026-11-14 20:43:53] 
 ============================================================================
-[2026-11-14 20:22:43] EXPERIMENT 2B: NON-REPEATABLE READ PREVENTION UNDER REPEATABLE READ
-[2026-11-14 20:22:43] ============================================================================
-[2026-11-14 20:22:43] [Session 1] Step 2B.1: Start transaction in REPEATABLE READ and query running test jobs
-[2026-11-14 20:22:44] Session 1 (Query 1): running_test_jobs 
+[2026-11-14 20:43:53] EXPERIMENT 2B: NON-REPEATABLE READ PREVENTION UNDER REPEATABLE READ
+[2026-11-14 20:43:53] ============================================================================
+[2026-11-14 20:43:53] [Session 1] Step 2B.1: Start transaction in REPEATABLE READ and inspect Job 102
+[2026-11-14 20:43:54] Session 1 (Query 1 - Status): job_id | status  
+--------+---------
+    102 | RUNNING
+(1 row)
+[2026-11-14 20:43:54] Session 1 (Query 1 - Count):  running_test_jobs 
 -------------------
                  1
 (1 row)
-[2026-11-14 20:22:44] 
-[Session 2] Step 2B.2: Concurrent session completes the remaining job 102 and commits
-[2026-11-14 20:22:45] Session 2 (Commit completed job): COMMIT
-[2026-11-14 20:22:45] 
-[Session 1] Step 2B.3: Session 1 repeats identical query within REPEATABLE READ transaction
-[2026-11-14 20:22:46] Session 1 (Query 2): running_test_jobs 
+[2026-11-14 20:43:54] 
+[Session 2] Step 2B.2: Concurrent session completes remaining Job 102 and commits
+[2026-11-14 20:43:55] Session 2 (Commit completed job): COMMIT
+[2026-11-14 20:43:55] 
+[Session 1] Step 2B.3: Session 1 repeats identical queries within REPEATABLE READ transaction
+[2026-11-14 20:43:56] Session 1 (Query 2 - Status): job_id | status  
+--------+---------
+    102 | RUNNING
+(1 row) --> [Status remains RUNNING despite concurrent commit!]
+[2026-11-14 20:43:56] Session 1 (Query 2 - Count):  running_test_jobs 
 -------------------
                  1
-(1 row) --> [CONSISTENCY GUARANTEED: Snapshot Isolation preserved! Count remains 1 despite Session 2's commit]
-[2026-11-14 20:22:46] 
+(1 row) --> [Count remains 1 despite concurrent commit!]
+[2026-11-14 20:43:57] VERIFIED: REPEATABLE READ preserved the transaction-level snapshot; concurrent commit remained invisible.
+[2026-11-14 20:43:57] 
 ============================================================================
-[2026-11-14 20:22:46] EXPERIMENT 2C: WRITE SKEW DETECTION UNDER SERIALIZABLE (SSI)
-[2026-11-14 20:22:46] ============================================================================
-[2026-11-14 20:22:47] [Session 1] Step 2C.1: Start SERIALIZABLE transaction and inspect operational scanners
-[2026-11-14 20:22:47] Session 1 (Count): operational_count 
+[2026-11-14 20:43:57] EXPERIMENT 2C: WRITE SKEW DETECTION UNDER SERIALIZABLE (SSI)
+[2026-11-14 20:43:57] ============================================================================
+[2026-11-14 20:43:57] [Session 1] Step 2C.1: Start SERIALIZABLE transaction and inspect operational scanners
+[2026-11-14 20:43:58] Session 1 (Count): operational_count 
 -------------------
                  2
 (1 row)
-[2026-11-14 20:22:47] 
+[2026-11-14 20:43:58] 
 [Session 2] Step 2C.2: Start SERIALIZABLE transaction and inspect operational scanners
-[2026-11-14 20:22:48] Session 2 (Count): operational_count 
+[2026-11-14 20:43:59] Session 2 (Count): operational_count 
 -------------------
                  2
 (1 row)
-[2026-11-14 20:22:48] 
+[2026-11-14 20:43:59] 
 [Session 1] Step 2C.3: Seeing count >= 2, Session 1 sets SCN-LOS-3T01 offline
-[2026-11-14 20:22:49] Session 1: UPDATE 1
-[2026-11-14 20:22:49] 
+[2026-11-14 20:43:59] Session 1: Scheduled SCN-LOS-3T01 offline
+[2026-11-14 20:43:59] 
 [Session 2] Step 2C.4: Seeing count >= 2, Session 2 sets SCN-LOS-15T1 offline
-[2026-11-14 20:22:49] Session 2: UPDATE 1
-[2026-11-14 20:22:49] 
+[2026-11-14 20:43:59] Session 2: Scheduled SCN-LOS-15T1 offline
+[2026-11-14 20:43:59] 
 [Session 1] Step 2C.5: Session 1 commits first
-[2026-11-14 20:22:49] Session 1 (Commit): COMMIT
-[2026-11-14 20:22:49] 
+[2026-11-14 20:44:00] Session 1 (Commit): COMMIT
+[2026-11-14 20:44:00] 
 [Session 2] Step 2C.6: Session 2 attempts to commit
-[2026-11-14 20:22:50] Session 2 (Commit attempt): ERROR:  could not serialize access due to read/write dependencies among transactions
+[2026-11-14 20:44:00] Session 2 (Commit attempt): ERROR:  could not serialize access due to read/write dependencies among transactions
 DETAIL:  Reason code: Canceled on identification as a pivot, during commit attempt.
-HINT:  The transaction might succeed if retried. --> [SSI CAUGHT WRITE SKEW: Aborted with serialization_failure (40001)!]
-[2026-11-14 20:22:50] 
+HINT:  The transaction might succeed if retried.
+[2026-11-14 20:44:00] VERIFIED: Serializable Snapshot Isolation (SSI) detected rw-antidependency cycle and aborted Session 2 (SQLSTATE 40001).
+[2026-11-14 20:44:01] 
 ============================================================================
-[2026-11-14 20:22:50] EXPERIMENT 3: DEADLOCK DETECTION & RESOLUTION (WAIT-FOR GRAPH CYCLE)
-[2026-11-14 20:22:50] ============================================================================
-[2026-11-14 20:22:51] [Session 1] Step 3.1: Begin and acquire lock on mri_scans row (SCN-LOS-006-T1)
-[2026-11-14 20:22:52] Session 1: UPDATE 1
-[2026-11-14 20:22:52] 
-[Session 2] Step 3.2: Begin and acquire lock on qc_evaluations row (SCN-LOS-006-T1)
-[2026-11-14 20:22:53] Session 2: UPDATE 1
-[2026-11-14 20:22:53] 
+[2026-11-14 20:44:01] EXPERIMENT 3: DEADLOCK DETECTION & RESOLUTION (WAIT-FOR GRAPH CYCLE)
+[2026-11-14 20:44:01] ============================================================================
+[2026-11-14 20:44:01] [Session 1] Step 3.1: Begin and acquire lock on mri_scans row (SCN-LOS-001-T1)
+[2026-11-14 20:44:02] Session 1: UPDATE 1
+[2026-11-14 20:44:02] 
+[Session 2] Step 3.2: Begin and acquire lock on qc_evaluations row (SCN-LOS-001-T1)
+[2026-11-14 20:44:03] Session 2: UPDATE 1
+[2026-11-14 20:44:03] 
 [Session 1] Step 3.3: Session 1 requests lock on qc_evaluations row (BLOCKED by Session 2)
-[2026-11-14 20:22:53] Session 1: [BLOCKED - waiting for Session 2 on qc_evaluations]
-[2026-11-14 20:22:53] 
+[2026-11-14 20:44:03] Session 1: [BLOCKED - waiting for Session 2 on qc_evaluations]
+[2026-11-14 20:44:03] 
 [Session 2] Step 3.4: Session 2 requests lock on mri_scans row (BLOCKED by Session 1 - CYCLE FORMED!)
-[2026-11-14 20:22:53] Session 2: [MUTUAL WAIT DETECTED - Waiting for deadlock_timeout (1.0s) ...]
-[2026-11-14 20:22:55] Session 1 response: ERROR:  deadlock detected
-DETAIL:  Process 19485 waits for ShareLock on transaction 959; blocked by process 19487.
-Process 19487 waits for ShareLock on transaction 958; blocked by process 19485.
+[2026-11-14 20:44:03] Session 2: [MUTUAL WAIT DETECTED - Waiting for deadlock_timeout ...]
+[2026-11-14 20:44:05] Session 1 response: ERROR:  deadlock detected
+DETAIL:  Process 20703 waits for ShareLock on transaction 1113; blocked by process 20705.
+Process 20705 waits for ShareLock on transaction 1112; blocked by process 20703.
 HINT:  See server log for query details.
-CONTEXT:  while updating tuple (0,27) in relation "qc_evaluations"
-[2026-11-14 20:22:55] Session 2 response: UPDATE 1
-[2026-11-14 20:22:55] --> Engine resolved deadlock by aborting SESSION 1 (Victim selected via wait-for cycle).
-[2026-11-14 20:22:55] Session 2 unblocked and committed successfully: COMMIT
-[2026-11-14 20:22:56] 
+CONTEXT:  while updating tuple (0,22) in relation "qc_evaluations"
+[2026-11-14 20:44:05] Session 2 response: UPDATE 1
+[2026-11-14 20:44:05] --> Engine resolved deadlock by aborting SESSION 1 (Victim selected via wait-for cycle).
+[2026-11-14 20:44:06] Session 2 unblocked and committed successfully: COMMIT
+[2026-11-14 20:44:06] 
 ============================================================================
-[2026-11-14 20:22:56] TEST SUITE COMPLETED SUCCESSFULLY: ALL 3 CONCURRENCY EXPERIMENTS VERIFIED
-[2026-11-14 20:22:56] ============================================================================
+[2026-11-14 20:44:06] TEST SUITE COMPLETED SUCCESSFULLY: ALL 4 CONCURRENCY EXPERIMENTS VERIFIED
+[2026-11-14 20:44:06] ============================================================================

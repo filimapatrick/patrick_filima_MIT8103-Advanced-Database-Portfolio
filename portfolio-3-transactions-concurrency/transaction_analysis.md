@@ -5,23 +5,24 @@
 **Student:** Patrick Filima  
 **System:** African Neuroimaging Research Data Management System (ANRDMS)  
 **Database Engine:** PostgreSQL 16.16 (Homebrew, aarch64-apple-darwin)  
+**Dedicated Test Database:** `anrdms_transactions`  
 **Weighting:** 7 Marks  
 
 ---
 
 ## 1. Executive Summary
 
-In high-concurrency medical research environments, database transaction management is not merely an engineering concern; it is a clinical and ethical prerequisite. The **African Neuroimaging Research Data Management System (ANRDMS)** coordinates neuroimaging acquisition, radiological quality control (QC), and distributed High-Performance Computing (HPC) feature extraction across five tertiary teaching hospitals in Nigeria (LUTH, NHA, UCH, UNTH, and ABUTH).
+In multi-site medical research systems, database transaction management is a critical clinical, ethical, and computational prerequisite. The **African Neuroimaging Research Data Management System (ANRDMS)** coordinates neuroimaging acquisition, radiological quality control (QC), and distributed High-Performance Computing (HPC) feature extraction across five tertiary teaching hospitals in Nigeria (LUTH, NHA, UCH, UNTH, and ABUTH).
 
-This report presents the empirical verification and theoretical analysis for **Portfolio 3: Transactions and Concurrency**. Building directly upon the 11-table relational schema developed in Portfolio 1 and the query optimization benchmarks established in Portfolio 2, this portfolio demonstrates:
+This report presents the empirical verification and theoretical analysis for **Portfolio 3: Transactions and Concurrency**. To preserve the baseline dataset from Portfolio 1 and maintain the reproducibility of Portfolio 2 query optimization benchmarks, all experiments were executed in a dedicated, isolated database named `anrdms_transactions`.
 
-1. **ACID Properties in Clinical Neuroinformatics:** The practical enforcement of Atomicity, Consistency, Isolation, and Durability across multi-table workflows, including zero-orphan rollbacks and fine-grained `SAVEPOINT` fault tolerance.
-2. **PostgreSQL Multi-Version Concurrency Control (MVCC):** A physical storage-level exploration of PostgreSQL's tuple headers (`xmin`, `xmax`, `ctid`), demonstrating non-overwriting tuple versioning and Write-Ahead Logging (WAL).
-3. **ANSI Isolation Level Verification:** Empirical reproduction and resolution of concurrency phenomena, specifically **Non-Repeatable Reads** under `READ COMMITTED`, snapshot preservation under `REPEATABLE READ`, and **Write Skew** detection under Serializable Snapshot Isolation (`SERIALIZABLE`, SQLSTATE `40001`).
+### Key Technical Contributions:
+1. **ACID Properties in Clinical Neuroinformatics:** Practical demonstration of Atomicity, Consistency, Isolation, and Durability across multi-table imaging workflows, including zero-orphan rollbacks and fine-grained `SAVEPOINT` fault recovery.
+2. **PostgreSQL Multi-Version Concurrency Control (MVCC):** Storage-level inspection of tuple headers (`xmin`, `xmax`, `ctid`), demonstrating physical non-overwriting tuple versioning and Write-Ahead Logging (WAL) write and flush alignment.
+3. **ANSI Isolation Level Verification:** Empirical reproduction and resolution of concurrency phenomena: row-level and aggregate **Non-Repeatable Reads** under `READ COMMITTED`, snapshot preservation under `REPEATABLE READ`, and **Write Skew** detection under Serializable Snapshot Isolation (`SERIALIZABLE`, SQLSTATE `40001`).
 4. **Pessimistic Concurrency & High-Throughput Queueing:** Implementation of row-level locking (`SELECT ... FOR UPDATE`) to prevent lost updates, alongside non-blocking worker queue dispatch (`FOR UPDATE SKIP LOCKED`) for distributed imaging nodes.
-5. **Deadlock Detection & Resolution:** Intentional creation of a cyclic wait-for dependency between concurrent sessions, empirical capture of PostgreSQL's Lock Manager resolving the cycle after `deadlock_timeout` (SQLSTATE `40P01`), and architectural mitigation strategies.
-
-All experiments were executed live on PostgreSQL 16.16 and verified with raw transcripts in [`evidence/transaction_outputs.txt`](./evidence/transaction_outputs.txt) and [`evidence/concurrency_outputs.txt`](./evidence/concurrency_outputs.txt).
+5. **Deadlock Detection & Resolution:** Interleaved cross-table updates generating a wait-for graph cycle, automated cycle resolution by the PostgreSQL Lock Manager via `deadlock_timeout` (SQLSTATE `40P01`), and application retry patterns with jittered exponential backoff.
+6. **Automated Verification Harness:** A portable, cross-platform Python test harness ([`run_concurrency_tests.py`](./run_concurrency_tests.py)) that drives parallel interactive sessions and automatically asserts expected database outcomes.
 
 ---
 
@@ -58,6 +59,9 @@ When dozens of neuroimaging researchers, radiologists, and automated HPC compute
 ### 2.4 Durability
 Once an imaging session or QC evaluation is committed, its persistence is guaranteed even in the event of an unexpected hardware crash, power outage, or operating system panic. PostgreSQL guarantees durability via **Write-Ahead Logging (WAL)**: data page modifications are sequentially written and flushed to the active WAL segment (`pg_wal`) on physical disk before the `COMMIT` acknowledgement is returned to the client application (`synchronous_commit = on`).
 
+> [!NOTE]
+> **Durability Methodology Scope:** Inspecting the WAL insert, write, and flush LSNs demonstrates active WAL generation and verifies that PostgreSQL's flush protocol executed before transaction completion. It does not, by itself, empirically prove survivability across an unannounced physical power loss; that would require dedicated crash-simulation or power-interruption fault-injection experiments.
+
 ---
 
 ## 3. Practical Transaction Demonstrations & Evaluation
@@ -92,7 +96,7 @@ COMMIT;
 ```
 
 #### Empirical Result
-As documented in [`evidence/transaction_outputs.txt`](./evidence/transaction_outputs.txt), the transaction executed in **8.67 ms** and committed cleanly. A four-table join verification confirmed that all four records materialized simultaneously:
+As documented in [`evidence/transaction_outputs.txt`](./evidence/transaction_outputs.txt), each individual statement executed with measured timing (demographics insert: 2.52 ms; diagnosis insert: 1.40 ms; scan insert: 10.01 ms; QC insert: 1.18 ms; final COMMIT: 1.02 ms). A four-table join verification confirmed that all four records materialized simultaneously:
 
 | participant_id | biological_sex | birth_year | diagnosis_code | severity_stage | scan_id | sequence_type | overall_quality | snr_score |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -181,9 +185,12 @@ SAVEPOINT sp_scan_registered;  <-------------------+ (Rollback Target)
 
 ---
 
-### 3.4 Transaction 4: Physical MVCC Tuple Inspection (`xmin`, `xmax`, `ctid`)
+### 3.4 Transaction 4: Physical MVCC Tuple Inspection & Durability Configuration
 
-To understand how PostgreSQL handles transactions without locking readers, we queried the internal system attributes of row `ANRDMS-LOS-006` before, during, and after an update.
+To examine how PostgreSQL handles concurrent modifications without locking readers, we queried the internal system attributes of row `ANRDMS-LOS-006` before, during, and after an update.
+
+> [!NOTE]
+> Physical tuple locations (`ctid`) and transaction identifiers (`xmin`/`xmax`) depend on prior table modifications and database activity. The values reported below correspond to the execution recorded in [`evidence/transaction_outputs.txt`](./evidence/transaction_outputs.txt).
 
 ```sql
 SELECT participant_id, handedness, education_years,
@@ -197,19 +204,40 @@ WHERE participant_id = 'ANRDMS-LOS-006';
 #### Physical State Transitions
 ```
 1. Initial State (Pre-Update):
-   inserting_xid (xmin) = 890 | deleting_updating_xid (xmax) = 0   | physical_pointer (ctid) = (0, 26)
+   inserting_xid (xmin) = 1092 | deleting_updating_xid (xmax) = 1092 | physical_pointer (ctid) = (0, 26)
 
-2. Inside Transaction (txid_current = 894, Uncommitted Update):
-   inserting_xid (xmin) = 894 | deleting_updating_xid (xmax) = 0   | physical_pointer (ctid) = (0, 29)
+2. Inside Transaction (txid_current = 1096, Uncommitted Update):
+   inserting_xid (xmin) = 1096 | deleting_updating_xid (xmax) = 0    | physical_pointer (ctid) = (0, 29)
 
 3. Post-Commit State:
-   inserting_xid (xmin) = 894 | deleting_updating_xid (xmax) = 0   | physical_pointer (ctid) = (0, 29)
+   inserting_xid (xmin) = 1096 | deleting_updating_xid (xmax) = 0    | physical_pointer (ctid) = (0, 29)
+```
+
+#### Durability Configuration and WAL Flush Evidence
+In `transactions.sql`, we verified the engine's durability parameters and compared the WAL write versus flush positions:
+
+```sql
+SHOW synchronous_commit; -- Returned: on
+SHOW fsync;              -- Returned: on
+
+SELECT 
+    pg_current_wal_insert_lsn() AS wal_insert_lsn,
+    pg_current_wal_lsn() AS wal_write_lsn,
+    pg_current_wal_flush_lsn() AS wal_flush_lsn,
+    pg_walfile_name(pg_current_wal_lsn()) AS active_wal_segment_file;
+```
+
+Recorded Output:
+```
+ wal_insert_lsn | wal_write_lsn | wal_flush_lsn | active_wal_segment_file  
+----------------+---------------+---------------+--------------------------
+ 0/F1813F0      | 0/F1813F0     | 0/F1813F0     | 00000001000000000000000F
 ```
 
 #### Technical Analysis
-1. **Physical Non-Overwrite:** The update of `handedness` from `'Right'` to `'Ambidextrous'` did **not** overwrite bytes in place on disk block 0. Instead, PostgreSQL allocated a brand new tuple at physical slot `(0, 29)`.
-2. **Version Chaining:** The original tuple at slot `(0, 26)` had its `xmax` set to `894` and its internal `t_ctid` pointer updated to point to `(0, 29)`. Any concurrent transaction whose snapshot predated transaction `894` continued reading the old tuple at `(0, 26)` without waiting or blocking!
-3. **Write-Ahead Log Flush:** During the commit, the active WAL segment recorded LSN `0/EB43B38` in file `00000001000000000000000E`, guaranteeing physical durability before the client was notified.
+1. **Physical Non-Overwrite:** The update of `handedness` from `'Right'` to `'Ambidextrous'` did **not** overwrite bytes in place on disk block 0. Instead, PostgreSQL allocated a new physical tuple at slot `(0, 29)`.
+2. **Version Chaining:** The original tuple at slot `(0, 26)` was superseded, pointing to `(0, 29)`. Concurrent transactions whose snapshot predated transaction `1096` continue reading slot `(0, 26)` without waiting or blocking.
+3. **Synchronous Flush Verification:** The equality `wal_insert_lsn == wal_write_lsn == wal_flush_lsn` (`0/F1813F0`) confirms that PostgreSQL actively wrote and flushed WAL buffers to non-volatile disk storage before acknowledging the commit, satisfying the synchronous commit contract.
 
 ---
 
@@ -233,33 +261,41 @@ The ANSI/ISO SQL-92 standard defines four transaction isolation levels in terms 
 
 ### 4.2 Empirical Isolation Level Experiments
 
-Using our dual-session test suite ([`run_concurrency_tests.py`](./run_concurrency_tests.py)), we executed three rigorous concurrency tests across concurrent PostgreSQL processes.
+Using our portable dual-session test suite ([`run_concurrency_tests.py`](./run_concurrency_tests.py)), we executed four verified concurrency tests across concurrent PostgreSQL processes.
 
 #### Test 2A: Non-Repeatable Read under `READ COMMITTED`
-- **Session 1** begins a `READ COMMITTED` transaction and audits the count of running test jobs:
+- **Session 1** begins a `READ COMMITTED` transaction and inspects Job `101` and the count of running test jobs:
   ```sql
-  SELECT count(*) FROM processing_jobs WHERE job_id IN (101, 102) AND status = 'RUNNING';
-  -- Result: 2
+  SELECT job_id, status FROM processing_jobs WHERE job_id = 101;
+  -- Returns: status = 'RUNNING'
+  SELECT count(*) AS running_test_jobs FROM processing_jobs WHERE job_id IN (101, 102) AND status = 'RUNNING';
+  -- Returns: 2
   ```
 - **Session 2** concurrently updates Job `101` to `'COMPLETED'` and commits (`COMMIT`).
-- **Session 1** repeats the exact same query within its open transaction:
+- **Session 1** repeats the exact same queries within its open transaction:
   ```sql
-  SELECT count(*) FROM processing_jobs WHERE job_id IN (101, 102) AND status = 'RUNNING';
-  -- Result: 1
+  SELECT job_id, status FROM processing_jobs WHERE job_id = 101;
+  -- Returns: status = 'COMPLETED' (Row-level Non-Repeatable Read)
+  SELECT count(*) AS running_test_jobs FROM processing_jobs WHERE job_id IN (101, 102) AND status = 'RUNNING';
+  -- Returns: 1 (Aggregate Non-Repeatable Read)
   ```
-- **Finding:** A Non-Repeatable Read occurred. Under `READ COMMITTED`, every single SQL statement takes a fresh snapshot of the database. The commit by Session 2 became immediately visible to Session 1's subsequent statement.
+- **Finding:** Non-Repeatable Read was observed at both the row level and aggregate level. Under `READ COMMITTED`, every single SQL statement takes a fresh snapshot of the database. The commit by Session 2 became immediately visible to Session 1's subsequent statements.
 
 #### Test 2B: Prevention of Non-Repeatable Read under `REPEATABLE READ`
-- **Session 1** begins with `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ` and queries the running job count:
+- **Session 1** begins with `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ` and inspects Job `102`:
   ```sql
-  SELECT count(*) FROM processing_jobs WHERE job_id IN (101, 102) AND status = 'RUNNING';
-  -- Result: 1 (Job 102)
+  SELECT job_id, status FROM processing_jobs WHERE job_id = 102;
+  -- Returns: status = 'RUNNING'
+  SELECT count(*) AS running_test_jobs FROM processing_jobs WHERE job_id IN (101, 102) AND status = 'RUNNING';
+  -- Returns: 1
   ```
 - **Session 2** completes Job `102` and commits (`COMMIT`).
-- **Session 1** repeats the query within its transaction:
+- **Session 1** repeats both queries within its open transaction:
   ```sql
-  SELECT count(*) FROM processing_jobs WHERE job_id IN (101, 102) AND status = 'RUNNING';
-  -- Result: 1
+  SELECT job_id, status FROM processing_jobs WHERE job_id = 102;
+  -- Returns: status = 'RUNNING' (Preserved)
+  SELECT count(*) AS running_test_jobs FROM processing_jobs WHERE job_id IN (101, 102) AND status = 'RUNNING';
+  -- Returns: 1 (Preserved)
   ```
 - **Finding:** In `REPEATABLE READ`, the snapshot is frozen at the instant the first relational query executes (`GetTransactionSnapshot()`). Session 2's commit is invisible to Session 1, preserving snapshot isolation.
 
@@ -268,12 +304,12 @@ Using our dual-session test suite ([`run_concurrency_tests.py`](./run_concurrenc
 ### 4.3 Test 2C: Write Skew Anomaly and Serializable Snapshot Isolation (SSI)
 
 #### The Clinical Problem
-In acute stroke imaging, a hospital site must maintain at least one operational 3.0T MRI scanner at all times for emergency diffusion imaging. At `SITE-LOS-01`, two scanners are currently operational: `SCN-LOS-3T01` and `SCN-LOS-15T1`.
+In acute stroke imaging, a hospital site must maintain at least one operational 3.0T MRI scanner at all times for emergency diffusion imaging. At `SITE-LOS-01`, two scanners are operational: `SCN-LOS-3T01` and `SCN-LOS-15T1`.
 
 Under standard `REPEATABLE READ`:
 1. Radiologist A checks the operational count (`count = 2`). Since $2 \ge 2$, Radiologist A schedules `SCN-LOS-3T01` for coil replacement (`is_operational = FALSE`).
 2. Concurrently, Radiologist B checks the operational count (`count = 2` in their snapshot). Radiologist B schedules `SCN-LOS-15T1` for gradient maintenance (`is_operational = FALSE`).
-3. Both transactions commit! **The hospital now has zero operational scanners.** Both transactions acted on valid snapshots, but their interleaved execution violated the clinical business rule. This is the classic **Write Skew anomaly** (Fekete et al., 2005).
+3. Both transactions commit. The hospital is left with zero operational scanners. Both transactions acted on valid snapshots, but their interleaved execution violated the clinical business rule. This is the classic **Write Skew anomaly** (Fekete et al., 2005).
 
 #### The PostgreSQL SSI Solution
 We repeated this scenario under `ISOLATION LEVEL SERIALIZABLE`:
@@ -296,7 +332,7 @@ COMMIT; (Succeeds)
 #### Engine Diagnostics
 PostgreSQL uses **Serializable Snapshot Isolation (SSI)** (Cahill, Röhm, & Fekete, 2008). Rather than using heavy read locks that block concurrent readers, PostgreSQL maintains lightweight in-memory `SIREAD` lock flags on tuple headers and relation indexes. 
 
-When Session 1 modified a tuple that Session 2 read, and Session 2 modified a tuple that Session 1 read, PostgreSQL identified a cycle of **rw-antidependencies** ($T_1 \xrightarrow{rw} T_2 \xrightarrow{rw} T_1$). Upon Session 2's commit attempt, the engine identified $T_2$ as a pivot transaction and aborted it with error `40001 (serialization_failure)`, preserving the hospital's operational scanner constraint!
+When Session 1 modified a tuple that Session 2 read, and Session 2 modified a tuple that Session 1 read, PostgreSQL identified a cycle of **rw-antidependencies** ($T_1 \xrightarrow{rw} T_2 \xrightarrow{rw} T_1$). Upon Session 2's commit attempt, the engine identified $T_2$ as a pivot transaction and aborted it with error `40001 (serialization_failure)`. This prevented the conflicting transactions from both committing, enforcing the application's operational-scanner constraint.
 
 ---
 
@@ -306,7 +342,7 @@ When Session 1 modified a tuple that Session 2 read, and Session 2 modified a tu
 
 When distributed compute nodes pull jobs from `processing_jobs`, two worker daemons reading the same `PENDING` job will cause duplicate execution and lost updates if uncoordinated.
 
-In Experiment 1, Worker 1 executed:
+In Experiment 1A, Worker 1 executed:
 ```sql
 BEGIN;
 SELECT job_id, scan_id, pipeline_id, status 
@@ -335,8 +371,8 @@ FOR UPDATE SKIP LOCKED;
 #### Empirical Timeline
 1. **Worker 1** locked Job `101`.
 2. **Worker 2** executed the identical query simultaneously.
-3. Rather than blocking, Worker 2's query **skipped the locked tuple 101** and immediately locked Job `102`!
-4. Both workers processed disjoint neuroimaging jobs concurrently with **zero wait time**.
+3. In this experiment, Worker 2 did not wait for the locked job; it automatically skipped tuple `101` and claimed Job `102`.
+4. Both workers processed disjoint neuroimaging jobs concurrently without contention.
 
 ---
 
@@ -348,12 +384,12 @@ In multi-table systems, deadlocks occur when concurrent transactions acquire loc
 
 ```mermaid
 flowchart LR
-    subgraph Session_1 ["Session 1 (Process 19485)"]
-        S1["Holds Lock: mri_scans (SCN-LOS-006-T1)"]
+    subgraph Session_1 ["Session 1 (Process 20703)"]
+        S1["Holds Lock: mri_scans (SCN-LOS-001-T1)"]
     end
 
-    subgraph Session_2 ["Session 2 (Process 19487)"]
-        S2["Holds Lock: qc_evaluations (SCN-LOS-006-T1)"]
+    subgraph Session_2 ["Session 2 (Process 20705)"]
+        S2["Holds Lock: qc_evaluations (SCN-LOS-001-T1)"]
     end
 
     S1 -- "Requests Lock (Waits)" --> S2
@@ -362,17 +398,17 @@ flowchart LR
 
 ### 6.2 Empirical Lock Manager Output
 
-As documented in [`evidence/concurrency_outputs.txt`](./evidence/concurrency_outputs.txt), after exactly 1,000 ms (`deadlock_timeout = 1s`), the engine's background deadlock detector ran:
+As documented in [`evidence/concurrency_outputs.txt`](./evidence/concurrency_outputs.txt), after the configured `deadlock_timeout` interval (1.0s default), PostgreSQL's Lock Manager detected the directed cycle and aborted the victim:
 
 ```
-[2026-11-14 20:22:55] Session 1 response: ERROR:  deadlock detected
-DETAIL:  Process 19485 waits for ShareLock on transaction 959; blocked by process 19487.
-Process 19487 waits for ShareLock on transaction 958; blocked by process 19485.
+[2026-11-14 20:44:05] Session 1 response: ERROR:  deadlock detected
+DETAIL:  Process 20703 waits for ShareLock on transaction 1113; blocked by process 20705.
+Process 20705 waits for ShareLock on transaction 1112; blocked by process 20703.
 HINT:  See server log for query details.
-CONTEXT:  while updating tuple (0,27) in relation "qc_evaluations"
-[2026-11-14 20:22:55] Session 2 response: UPDATE 1
-[2026-11-14 20:22:55] --> Engine resolved deadlock by aborting SESSION 1 (Victim selected via wait-for cycle).
-[2026-11-14 20:22:55] Session 2 unblocked and committed successfully: COMMIT
+CONTEXT:  while updating tuple (0,22) in relation "qc_evaluations"
+[2026-11-14 20:44:05] Session 2 response: UPDATE 1
+[2026-11-14 20:44:05] --> Engine resolved deadlock by aborting SESSION 1 (Victim selected via wait-for cycle).
+[2026-11-14 20:44:06] Session 2 unblocked and committed successfully: COMMIT
 ```
 
 ### 6.3 Engineering Mitigations in Medical Software
@@ -410,7 +446,7 @@ def execute_with_deadlock_retry(db_connection, sql_work_func, max_retries=5):
 
 ## 7. Technical Reflection & PostgreSQL MVCC Trade-Offs
 
-While PostgreSQL's MVCC architecture delivers exceptional concurrency, it introduces distinct database administration challenges that must be planned for in high-volume imaging systems:
+While PostgreSQL's MVCC architecture delivers exceptional concurrency, it introduces distinct database administration considerations that must be managed in high-volume imaging systems:
 
 1. **Table Bloat and Dead Tuples:**
    Because `UPDATE` statements do not modify rows in place, frequently updated tables (such as `processing_jobs` transitioning from `PENDING` $\to$ `RUNNING` $\to$ `COMPLETED`) accumulate dead tuple versions on disk.
@@ -433,7 +469,7 @@ While PostgreSQL's MVCC architecture delivers exceptional concurrency, it introd
 
 Portfolio 3 has demonstrated that PostgreSQL 16 provides an enterprise-grade transaction processing engine capable of meeting the rigorous clinical and computational demands of the African Neuroimaging Research Data Management System. 
 
-Through multi-table atomic transactions, constraint-driven rollbacks, savepoint fault-tolerance, row-level queueing, snapshot isolation, and deadlock management, ANRDMS guarantees that clinical data integrity is never compromised by hardware failures or concurrent research operations.
+Through multi-table atomic transactions, constraint-driven rollbacks, savepoint fault-tolerance, row-level queueing, snapshot isolation, and deadlock management, ANRDMS guarantees that clinical data integrity is never compromised by application failures or concurrent research operations.
 
 ---
 

@@ -128,10 +128,12 @@ COMMIT; -- Session 2
 
 -- [Session 1 - Step 2A.1] Begin transaction in default READ COMMITTED mode
 BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+-- Read individual row status and aggregate count
+SELECT job_id, status FROM processing_jobs WHERE job_id = 101;
 SELECT count(*) AS running_test_jobs 
 FROM processing_jobs 
 WHERE job_id IN (101, 102) AND status = 'RUNNING';
--- Returns 2
+-- Returns status = 'RUNNING', count = 2
 
 -- [Session 2 - Step 2A.2] Concurrent session completes Job 101 and commits
 BEGIN;
@@ -140,11 +142,13 @@ SET status = 'COMPLETED', end_time = CURRENT_TIMESTAMP, exit_code = 0
 WHERE job_id = 101;
 COMMIT;
 
--- [Session 1 - Step 2A.3] Re-execute identical query within the same transaction
+-- [Session 1 - Step 2A.3] Re-execute identical queries within the same transaction
+SELECT job_id, status FROM processing_jobs WHERE job_id = 101;
 SELECT count(*) AS running_test_jobs 
 FROM processing_jobs 
 WHERE job_id IN (101, 102) AND status = 'RUNNING';
--- --> RESULT IN SESSION 1: Non-repeatable read observed! The count decreased from 2 to 1
+-- --> RESULT IN SESSION 1: Non-repeatable read observed!
+--     Row-level status changed from 'RUNNING' to 'COMPLETED' and count decreased from 2 to 1
 --     within the same transaction because READ COMMITTED obtains a new snapshot per statement.
 COMMIT;
 
@@ -160,10 +164,11 @@ COMMIT;
 
 -- [Session 1 - Step 2B.1] Begin transaction in REPEATABLE READ mode
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SELECT job_id, status FROM processing_jobs WHERE job_id = 102;
 SELECT count(*) AS running_test_jobs 
 FROM processing_jobs 
 WHERE job_id IN (101, 102) AND status = 'RUNNING';
--- Returns 1 (Job 102)
+-- Returns status = 'RUNNING', count = 1 (Job 102)
 
 -- [Session 2 - Step 2B.2] Concurrent session completes the second job (102) and commits
 BEGIN;
@@ -172,12 +177,13 @@ SET status = 'COMPLETED', end_time = CURRENT_TIMESTAMP, exit_code = 0
 WHERE job_id = 102;
 COMMIT;
 
--- [Session 1 - Step 2B.3] Re-execute query within the same transaction
+-- [Session 1 - Step 2B.3] Re-execute queries within the same transaction
+SELECT job_id, status FROM processing_jobs WHERE job_id = 102;
 SELECT count(*) AS running_test_jobs 
 FROM processing_jobs 
 WHERE job_id IN (101, 102) AND status = 'RUNNING';
--- --> RESULT IN SESSION 1: Consistent snapshot preserved! The count remains 1
---     despite Session 2's commit.
+-- --> RESULT IN SESSION 1: Consistent snapshot preserved!
+--     Row-level status remains 'RUNNING' and count remains 1 despite Session 2's commit.
 COMMIT;
 
 
