@@ -1,0 +1,168 @@
+```mermaid
+erDiagram
+    RESEARCH_SITES ||--o{ MRI_SCANNERS : "houses"
+    RESEARCH_SITES ||--o{ RESEARCHERS : "employs / affiliates"
+    RESEARCH_SITES ||--o{ PARTICIPANTS : "recruits / primary site"
+    
+    RESEARCHERS ||--o{ RESEARCH_PROJECTS : "leads as PI"
+    RESEARCHERS ||--o{ PARTICIPANT_DIAGNOSES : "evaluates"
+    RESEARCHERS ||--o{ PROCESSING_JOBS : "submits"
+    RESEARCHERS ||--o{ QC_EVALUATIONS : "assesses"
+    
+    RESEARCH_PROJECTS ||--o{ MRI_SCANS : "funds / protocol"
+    
+    PARTICIPANTS ||--o{ PARTICIPANT_DIAGNOSES : "has"
+    PARTICIPANTS ||--o{ MRI_SCANS : "undergoes"
+    
+    NEUROLOGICAL_DIAGNOSES ||--o{ PARTICIPANT_DIAGNOSES : "classifies"
+    
+    MRI_SCANNERS ||--o{ MRI_SCANS : "acquires"
+    
+    MRI_SCANS ||--o{ PROCESSING_JOBS : "processed by"
+    MRI_SCANS ||--o{ QC_EVALUATIONS : "reviewed in"
+    
+    PROCESSING_PIPELINES ||--o{ PROCESSING_JOBS : "executes"
+
+    RESEARCH_SITES {
+        varchar site_id PK
+        varchar hospital_name
+        varchar city
+        varchar state
+        varchar tier
+        varchar contact_email
+        varchar phone_number
+        boolean is_active
+        timestamptz created_at
+    }
+
+    MRI_SCANNERS {
+        varchar scanner_id PK
+        varchar site_id FK
+        varchar manufacturer
+        varchar model_name
+        numeric magnetic_field_strength_tesla
+        numeric gradient_strength_mt_m
+        varchar software_version
+        date installation_date
+        date last_calibration_date
+        boolean is_operational
+        timestamptz created_at
+    }
+
+    RESEARCHERS {
+        varchar researcher_id PK
+        varchar full_name
+        varchar email UK
+        varchar affiliation_site_id FK
+        varchar role
+        varchar orcid
+        timestamptz created_at
+    }
+
+    RESEARCH_PROJECTS {
+        varchar project_id PK
+        varchar project_name
+        varchar principal_investigator_id FK
+        varchar funding_agency
+        varchar ethics_approval_code UK
+        date start_date
+        date end_date
+        varchar status
+        timestamptz created_at
+    }
+
+    PARTICIPANTS {
+        varchar participant_id PK
+        varchar primary_site_id FK
+        date enrollment_date
+        int birth_year
+        varchar biological_sex
+        varchar handedness
+        int education_years
+        boolean consent_obtained
+        timestamptz created_at
+    }
+
+    NEUROLOGICAL_DIAGNOSES {
+        varchar diagnosis_code PK
+        varchar condition_name UK
+        varchar category
+        varchar icd11_code
+        text description
+    }
+
+    PARTICIPANT_DIAGNOSES {
+        bigserial participant_diagnosis_id PK
+        varchar participant_id FK
+        varchar diagnosis_code FK
+        varchar diagnosing_researcher_id FK
+        date diagnosis_date
+        varchar severity_stage
+        boolean is_primary_diagnosis
+        text clinical_notes
+        timestamptz created_at
+    }
+
+    MRI_SCANS {
+        varchar scan_id PK
+        varchar participant_id FK
+        varchar scanner_id FK
+        varchar project_id FK
+        timestamptz acquisition_date
+        varchar modality
+        varchar sequence_type
+        numeric repetition_time_ms
+        numeric echo_time_ms
+        numeric flip_angle_deg
+        numeric voxel_size_x_mm
+        numeric voxel_size_y_mm
+        numeric voxel_size_z_mm
+        int matrix_x
+        int matrix_y
+        int slices_count
+        varchar dicom_series_uid UK
+        varchar bids_relative_path UK
+        bigint file_size_bytes
+        timestamptz created_at
+    }
+
+    PROCESSING_PIPELINES {
+        varchar pipeline_id PK
+        varchar name
+        varchar version
+        varchar container_image
+        varchar target_sequence
+        text description
+        boolean is_active
+        timestamptz created_at
+    }
+
+    PROCESSING_JOBS {
+        bigserial job_id PK
+        varchar scan_id FK
+        varchar pipeline_id FK
+        varchar submitted_by_id FK
+        timestamptz submission_time
+        timestamptz start_time
+        timestamptz end_time
+        varchar status
+        int exit_code
+        varchar compute_node
+        varchar output_directory
+        text error_message
+    }
+
+    QC_EVALUATIONS {
+        bigserial qc_id PK
+        varchar scan_id FK
+        varchar evaluator_id FK
+        timestamptz evaluation_date
+        varchar overall_quality
+        numeric snr_score
+        numeric cnr_score
+        numeric head_motion_fd_mean_mm
+        boolean usable_for_analysis
+        text artifact_notes
+        timestamptz created_at
+    }
+```
