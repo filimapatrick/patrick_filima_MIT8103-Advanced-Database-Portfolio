@@ -1,0 +1,209 @@
+============================================================================
+CONNECTED TO LIVE MONGODB SERVER
+MongoDB Engine Version: 7.0.14
+Target Database: anrdms_nosql
+============================================================================
+
+=== 1. CREATING COLLECTIONS WITH STRICT $jsonSchema VALIDATION ===
+Collections 'scans_bids' and 'pipeline_metrics' created with $jsonSchema validation.
+
+=== 2. CREATING SPECIALIZED NOSQL INDEXES ===
+Created 6 indexes (unique, compound, multikey, sparse) across collections.
+
+=== 3. INGESTING HETEROGENEOUS BIDS DOCUMENTS ===
+Inserted 8 documents into 'scans_bids'.
+Inserted 4 documents into 'pipeline_metrics'.
+
+=== 4. EXECUTING NEGATIVE VALIDATION TESTS ===
+
+--- Negative Test 1: $jsonSchema Field Range Violation ---
+Attempting to insert scan with 20.0 Tesla magnetic field (limit: 0.2T - 7.5T)...
+EXPECTED REJECTION: Document failed $jsonSchema validation constraint.
+Error Code: 121 | Error Name: MongoServerError
+Server Error: Document failed validation
+
+--- Negative Test 2: Unique Index Violation ---
+Attempting to insert duplicate scan_id 'SCN-LOS-001-T1'...
+EXPECTED REJECTION: Duplicate key rejected by unique index idx_scans_scan_id_unique.
+Error Code: 11000 | Error Name: MongoServerError
+Server Error: E11000 duplicate key error collection: anrdms_nosql.scans_bids index: idx_scans_scan_id_unique dup key: { scan_id: "SCN-LOS-001-T1" }
+
+=== 5. MULTIKEY INDEX QUERY EXECUTION PLAN ===
+Analyzing execution plan for query: diffusion_protocol.b_values = 2000
+
+Winning Plan Summary:
+{
+  "stage": "FETCH",
+  "inputStage": {
+    "stage": "IXSCAN",
+    "indexName": "idx_scans_dmri_bvalues_multikey",
+    "isMultiKey": true
+  }
+}
+
+Execution Stats:
+{
+  "executionSuccess": true,
+  "nReturned": 1,
+  "totalKeysExamined": 1,
+  "totalDocsExamined": 1,
+  "executionTimeMillis": 1
+}
+
+=== 6. EXECUTING ADVANCED AGGREGATION PIPELINES ===
+
+--- Pipeline 1: Subcortical Volumetric Atrophy across Clinical Cohorts ---
+[
+  {
+    "_id": "Early-onset Alzheimer's dementia",
+    "cohort_category": "Neurodegenerative",
+    "scans_analyzed_count": 1,
+    "condition": "Early-onset Alzheimer's dementia",
+    "avg_left_hippocampus_mm3": 3120.4,
+    "avg_right_hippocampus_mm3": 3210.1,
+    "bilateral_hippocampus_total_mm3": 6330.5,
+    "avg_ventricle_volume_mm3": 58400
+  },
+  {
+    "_id": "Acute ischemic stroke",
+    "cohort_category": "Cerebrovascular",
+    "scans_analyzed_count": 1,
+    "condition": "Acute ischemic stroke",
+    "avg_left_hippocampus_mm3": 4150.2,
+    "avg_right_hippocampus_mm3": 4210.8,
+    "bilateral_hippocampus_total_mm3": 8361,
+    "avg_ventricle_volume_mm3": 32890.6
+  },
+  {
+    "_id": "Healthy Control Benchmark",
+    "cohort_category": "Healthy Control",
+    "scans_analyzed_count": 1,
+    "condition": "Healthy Control Benchmark",
+    "avg_left_hippocampus_mm3": 4480,
+    "avg_right_hippocampus_mm3": 4550,
+    "bilateral_hippocampus_total_mm3": 9030,
+    "avg_ventricle_volume_mm3": 24100
+  }
+]
+
+--- Pipeline 2: Regional Cortical Thinning Analysis via $unwind ---
+[
+  {
+    "anatomical_region": "entorhinal",
+    "clinical_condition": "Early-onset Alzheimer's dementia",
+    "sample_count": 2,
+    "mean_thickness_mm": 2.665,
+    "min_thickness_mm": 2.65,
+    "max_thickness_mm": 2.68
+  },
+  {
+    "anatomical_region": "entorhinal",
+    "clinical_condition": "Acute ischemic stroke",
+    "sample_count": 2,
+    "mean_thickness_mm": 3.435,
+    "min_thickness_mm": 3.42,
+    "max_thickness_mm": 3.45
+  },
+  {
+    "anatomical_region": "entorhinal",
+    "clinical_condition": "Healthy Control Benchmark",
+    "sample_count": 2,
+    "mean_thickness_mm": 3.565,
+    "min_thickness_mm": 3.55,
+    "max_thickness_mm": 3.58
+  },
+  {
+    "anatomical_region": "superiorfrontal",
+    "clinical_condition": "Early-onset Alzheimer's dementia",
+    "sample_count": 2,
+    "mean_thickness_mm": 2.39,
+    "min_thickness_mm": 2.38,
+    "max_thickness_mm": 2.4
+  },
+  {
+    "anatomical_region": "superiorfrontal",
+    "clinical_condition": "Acute ischemic stroke",
+    "sample_count": 2,
+    "mean_thickness_mm": 2.77,
+    "min_thickness_mm": 2.76,
+    "max_thickness_mm": 2.78
+  },
+  {
+    "anatomical_region": "superiorfrontal",
+    "clinical_condition": "Healthy Control Benchmark",
+    "sample_count": 2,
+    "mean_thickness_mm": 2.835,
+    "min_thickness_mm": 2.82,
+    "max_thickness_mm": 2.85
+  }
+]
+
+--- Pipeline 3: Hardware & High-Dimensional BIDS Acquisition Query ---
+[
+  {
+    "scan_id": "SCN-LOS-001-DM",
+    "participant_id": "ANRDMS-LOS-001",
+    "site_id": "SITE-LOS-01",
+    "scanner_model": "Magnetom Skyra",
+    "field_strength": 3,
+    "gradient_directions": 64,
+    "b_shells": [
+      0,
+      1000,
+      2000
+    ],
+    "phase_encoding": "j-"
+  }
+]
+
+--- Pipeline 4: Multi-Stage $facet Operational Analytics Dashboard ---
+[
+  {
+    "hpc_performance_by_pipeline": [
+      {
+        "_id": "FreeSurfer",
+        "total_jobs_run": 3,
+        "pipeline": "FreeSurfer",
+        "avg_runtime_hours": 7.45,
+        "avg_peak_ram_gb": 11.62
+      },
+      {
+        "_id": "FSL-TBSS",
+        "total_jobs_run": 1,
+        "pipeline": "FSL-TBSS",
+        "avg_runtime_hours": 3.94,
+        "avg_peak_ram_gb": 8.2
+      }
+    ],
+    "morphometric_surface_quality": [
+      {
+        "_id": "Acute ischemic stroke",
+        "clinical_condition": "Acute ischemic stroke",
+        "avg_lh_euler": -2,
+        "avg_rh_euler": -4,
+        "avg_repaired_holes": 3,
+        "avg_cnr": 8.42
+      },
+      {
+        "_id": "Healthy Control Benchmark",
+        "clinical_condition": "Healthy Control Benchmark",
+        "avg_lh_euler": 0,
+        "avg_rh_euler": -2,
+        "avg_repaired_holes": 1,
+        "avg_cnr": 8.95
+      },
+      {
+        "_id": "Early-onset Alzheimer's dementia",
+        "clinical_condition": "Early-onset Alzheimer's dementia",
+        "avg_lh_euler": -8,
+        "avg_rh_euler": -10,
+        "avg_repaired_holes": 9,
+        "avg_cnr": 7.15
+      }
+    ]
+  }
+]
+
+============================================================================
+LIVE MONGODB EXECUTION COMPLETE - ALL TESTS AND PIPELINES PASSED
+============================================================================

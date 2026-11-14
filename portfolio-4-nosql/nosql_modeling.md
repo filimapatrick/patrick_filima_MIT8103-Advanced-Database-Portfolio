@@ -117,7 +117,7 @@ Stores FreeSurfer cortical morphometry (subcortical structures, Desikan-Killiany
 
 ### 3.2 Schema Governance with MongoDB `$jsonSchema`
 
-Contrary to common misconception, production NoSQL databases are **schema-flexible**, not "schema-less". In [`scripts/mongodb_queries.js`](./scripts/mongodb_queries.js), we implement strict database-level validation using JSON Schema:
+Contrary to common misconception, production NoSQL databases are **schema-flexible**, not "schema-less". In [`scripts/mongodb_queries.js`](./scripts/mongodb_queries.js) and [`scripts/run_mongo.js`](./scripts/run_mongo.js), we implement strict database-level validation using JSON Schema:
 
 ```javascript
 db.createCollection("scans_bids", {
@@ -129,14 +129,28 @@ db.createCollection("scans_bids", {
         scan_id: { bsonType: "string", pattern: "^SCN-[A-Z]{3}-[0-9]{3}-[A-Z0-9]+$" },
         participant_id: { bsonType: "string", pattern: "^ANRDMS-[A-Z]{3}-[0-9]{3}$" },
         sequence_type: { enum: ["T1w", "T2w", "FLAIR", "dMRI", "fMRI-rest", "fMRI-task", "MRA"] },
-        "scanner_hardware.magnetic_field_tesla": { bsonType: ["double", "int", "decimal"], minimum: 0.2, maximum: 7.5 }
+        scanner_hardware: {
+          bsonType: "object",
+          required: ["vendor", "model", "magnetic_field_tesla"],
+          properties: {
+            magnetic_field_tesla: { bsonType: ["double", "int", "decimal"], minimum: 0.2, maximum: 7.5 }
+          }
+        }
       }
     }
   }
 });
 ```
 
-*Verification:* The automated test runner verified that 100% of the ingested neuroimaging documents satisfy this schema validation.
+#### Negative Validation Tests (Live Database Governance)
+To prove that MongoDB enforces these rules at the database engine level rather than relying solely on client-side application logic, we executed two explicit negative validation tests against the live engine (recorded in [`evidence/mongodb_live_outputs.txt`](./evidence/mongodb_live_outputs.txt)):
+
+1. **Negative Test 1: $jsonSchema Field Range Violation (Static Magnetic Field > 7.5T)**  
+   - *Attempt:* Inserting an unphysical 20.0 Tesla scanner (`magnetic_field_tesla: 20.0`).  
+   - *Engine Response:* Trapped by MongoDB server validator and rejected with `MongoServerError: Document failed validation` (Error Code: **121**). No invalid document was persisted.
+2. **Negative Test 2: Primary Key Unique Constraint Violation (`scan_id`)**  
+   - *Attempt:* Inserting a duplicate document with existing key `SCN-LOS-001-T1`.  
+   - *Engine Response:* Trapped by unique index `idx_scans_scan_id_unique` and rejected with `MongoServerError: E11000 duplicate key error` (Error Code: **11000**).
 
 ---
 
@@ -145,15 +159,38 @@ db.createCollection("scans_bids", {
 In document databases, secondary indexes must index into nested subdocuments and arrays:
 
 1. **Unique Primary Index:**  
-   `db.scans_bids.createIndex({ "scan_id": 1 }, { unique: true })` ensures global uniqueness of BIDS scan identifiers.
+   `db.scans_bids.createIndex({ "scan_id": 1 }, { unique: true, name: "idx_scans_scan_id_unique" })` ensures global uniqueness of BIDS scan identifiers.
 2. **Compound Multi-Site Index:**  
-   `db.scans_bids.createIndex({ "site_id": 1, "sequence_type": 1, "acquisition_date": -1 })` optimizes multi-site cohort discovery.
+   `db.scans_bids.createIndex({ "site_id": 1, "sequence_type": 1, "acquisition_date": -1 }, { name: "idx_scans_site_seq_date" })` optimizes multi-site cohort discovery.
 3. **Multikey Array Index (Diffusion b-values):**  
-   `db.scans_bids.createIndex({ "diffusion_protocol.b_values": 1 })` indexes individual numbers inside the array. A query matching `b_values: 2000` utilizes an index scan instead of a collection scan.
+   `db.scans_bids.createIndex({ "diffusion_protocol.b_values": 1 }, { name: "idx_scans_dmri_bvalues_multikey" })` indexes individual numbers inside the array. A query matching `b_values: 2000` utilizes a multikey index scan (`IXSCAN`).
 4. **Multikey Index on Subdocument Arrays:**  
-   `db.pipeline_metrics.createIndex({ "cortical_parcellations.region_name": 1 })` enables index lookups on individual anatomical regions inside the FreeSurfer parcellation array.
+   `db.pipeline_metrics.createIndex({ "cortical_parcellations.region_name": 1 }, { name: "idx_metrics_cortical_region_multikey" })` enables index lookups on individual anatomical regions inside the FreeSurfer parcellation array.
 5. **Sparse Index:**  
-   `db.pipeline_metrics.createIndex({ "execution_metrics.compute_node": 1 }, { sparse: true })` indexes compute node allocations only for documents where execution metrics exist, minimizing index memory footprint.
+   `db.pipeline_metrics.createIndex({ "execution_metrics.compute_node": 1 }, { sparse: true, name: "idx_metrics_compute_node_sparse" })` indexes compute node allocations only for documents where execution metrics exist, minimizing index memory footprint.
+
+### Multikey Index Execution Plan Verification
+We executed `explain("executionStats")` on the live MongoDB server for the array containment query `db.scans_bids.find({ "diffusion_protocol.b_values": 2000 })`. The recorded query planner output confirms:
+
+```json
+{
+  "stage": "FETCH",
+  "inputStage": {
+    "stage": "IXSCAN",
+    "indexName": "idx_scans_dmri_bvalues_multikey",
+    "isMultiKey": true
+  },
+  "executionStats": {
+    "executionSuccess": true,
+    "nReturned": 1,
+    "totalKeysExamined": 1,
+    "totalDocsExamined": 1,
+    "executionTimeMillis": 1
+  }
+}
+```
+
+*Architectural Significance:* The index flag `isMultiKey: true` confirms that MongoDB expanded each element of the `b_values` array (`[0, 1000, 2000]`) into distinct index leaf keys. The optimizer immediately accessed the target scan via an `IXSCAN` on `idx_scans_dmri_bvalues_multikey`, examining exactly 1 key and 1 document (`totalKeysExamined: 1`, `totalDocsExamined: 1`) in 1 ms without performing an expensive collection scan (`COLLSCAN`).
 
 ---
 
@@ -189,7 +226,7 @@ db.pipeline_metrics.aggregate([
 | **Acute ischemic stroke** | 4,150.2 | 4,210.8 | 8,361.0 | 32,890.6 |
 | **Healthy Control Benchmark**| 4,480.0 | 4,550.0 | 9,030.0 | 24,100.0 |
 
-*Clinical Finding:* Alzheimer's patients exhibit severe bilateral hippocampal volume loss ($6,330.5\text{ mm}^3$ vs $9,030.0\text{ mm}^3$ in controls; a $29.9\%$ volumetric loss) with marked compensatory ventricular enlargement ($58,400\text{ mm}^3$ vs $24,100\text{ mm}^3$).
+*Illustrative Synthetic Demonstration Results:* The Alzheimer's synthetic demonstration profile reflects marked bilateral hippocampal volume reduction ($6,330.5\text{ mm}^3$ vs $9,030.0\text{ mm}^3$ in Controls) with compensatory ventricular enlargement ($58,400\text{ mm}^3$ vs $24,100\text{ mm}^3$). These values illustrate multi-stage aggregation pipeline logic across synthetic demo documents, rather than population-level medical claims.
 
 ---
 
@@ -220,14 +257,21 @@ db.pipeline_metrics.aggregate([
 | **superiorfrontal**| Acute ischemic stroke | 2 | 2.770 | [2.760 – 2.780] |
 | **superiorfrontal**| Healthy Control Benchmark | 2 | 2.835 | [2.820 – 2.850] |
 
-*Neuropathological Finding:* The entorhinal cortex in early Alzheimer's shows pronounced localized thinning ($2.665\text{ mm}$ vs $3.565\text{ mm}$, a $25.2\%$ reduction), consistent with tau neurofibrillary tangle staging (Braak & Braak, 1991).
+*Illustrative Synthetic Demonstration Results:* Entorhinal cortex in the synthetic Alzheimer's demo document reflects localized cortical thinning ($2.665\text{ mm}$ vs $3.565\text{ mm}$ in Controls), successfully verifying the `$unwind` array deconstruction and grouping pipeline on nested parcellation structures.
 
 ---
 
-### Pipeline 3: Multi-Stage `$facet` Analytics Dashboard
+### Pipeline 3: Hardware & High-Dimensional BIDS Acquisition Query
+Filters multi-shell dMRI acquisitions with $b=2000\text{ s/mm}^2$ on $\ge 3.0\text{T}$ scanners:
+- Matches scan `SCN-LOS-001-DM` acquired on a Siemens Skyra 3.0T system with 64 gradient directions and multi-shell array `[0, 1000, 2000]`.
+- Demonstrates how document stores naturally query multi-shell arrays without requiring relational junction tables or string serialization.
+
+---
+
+### Pipeline 4: Multi-Stage `$facet` Analytics Dashboard
 Generates an executive operational dashboard in a single pipeline pass using `$facet`:
-- **Branch A (HPC Resource Consumption):** FreeSurfer jobs averaged 7.45 hours runtime and 11.62 GB peak RAM; FSL TBSS averaged 3.94 hours runtime and 8.20 GB RAM.
-- **Branch B (Topological Quality Metrics):** Tracks Euler numbers ($\chi = 2 - 2g$) where defects in Alzheimer's brains ($\chi = -8, -10$; 9 holes repaired) reflect severe cortical atrophy challenging mesh reconstruction algorithms.
+- **Branch A (HPC Resource Consumption):** FreeSurfer jobs averaged 7.45 hours runtime and 11.62 GiB peak RAM; FSL TBSS averaged 3.94 hours runtime and 8.20 GiB peak RAM.
+- **Branch B (Topological Surface Mesh Quality Metrics):** FreeSurfer Euler numbers ($\chi = 2 - 2g$) and defect counts. Crucially, Euler numbers serve as **mesh reconstruction topological quality metrics** rather than direct biological measurements of disease severity; a more negative Euler number ($\chi = -8, -10$; 9 surface holes repaired) indicates topological surface defects that required algorithmic patching during 3D cortical reconstruction.
 
 ---
 
@@ -240,7 +284,6 @@ flowchart TD
     subgraph RDBMS ["PostgreSQL Relational Backbone (ACID & Constraints)"]
         P["participants (Demographics, Ethics)"]
         S["research_sites (Hospital Tiers)"]
-        PRJ["research_projects (Grant Governance)"]
     end
 
     subgraph HYBRID ["Polyglot Bridge: PostgreSQL JSONB (GIN Indexed)"]
@@ -248,22 +291,22 @@ flowchart TD
         PM["pipeline_metrics_jsonb (Relational FK + Hierarchical Metrics)"]
     end
 
-    P --> SB
-    S --> SB
-    PRJ --> SB
-    SB --> PM
+    P -->|"FK: participant_id"| SB
+    S -->|"FK: site_id"| SB
+    SB -->|"FK: scan_id (CASCADE)"| PM
 ```
 
 In [`scripts/hybrid_jsonb.sql`](./scripts/hybrid_jsonb.sql), we implemented this architecture in PostgreSQL 16:
-1. `scans_bids_jsonb` anchors the scan using relational foreign keys (`scan_id`, `participant_id`, `site_id`) while storing the dynamic BIDS acquisition parameters in a `JSONB` column.
+1. `scans_bids_jsonb` anchors each scan to the core relational backbone using explicit foreign keys:
+   - `participant_id REFERENCES participants(participant_id) ON UPDATE CASCADE ON DELETE RESTRICT`
+   - `site_id REFERENCES research_sites(site_id) ON UPDATE CASCADE ON DELETE RESTRICT`
+   - While storing dynamic BIDS acquisition parameters in a binary `JSONB` column.
 2. `idx_scans_bids_metadata_gin` indexes the JSON payload using `USING gin (metadata jsonb_path_ops)`.
-3. Queries using the JSON containment operator (`@>`) were analyzed using `EXPLAIN (ANALYZE, BUFFERS)` in [`evidence/jsonb_hybrid_outputs.txt`](./evidence/jsonb_hybrid_outputs.txt):
-   ```sql
-   SELECT scan_id, metadata->'scanner_hardware'->>'model'
-   FROM scans_bids_jsonb
-   WHERE metadata @> '{"scanner_hardware": {"vendor": "Siemens Healthineers", "magnetic_field_tesla": 3.0}}';
-   ```
-4. Subcortical volumetry and cortical parcellation array unnesting were demonstrated using `LATERAL jsonb_array_elements()`, producing outputs identical to MongoDB's `$unwind` within 0.34 ms execution time.
+3. **Execution Plan Analysis & Cost-Based Optimizer Behavior:**  
+   In [`evidence/jsonb_hybrid_outputs.txt`](./evidence/jsonb_hybrid_outputs.txt), we analyzed the execution plans for the JSON containment query (`metadata @> '{"scanner_hardware": {"vendor": "Siemens Healthineers", "magnetic_field_tesla": 3.0}}'`):
+   - **Default Cost-Based Decision:** The PostgreSQL optimizer selected a `Seq Scan` (cost 0.00..1.05, actual time 0.004 ms) because the table contains only 4 demonstration records residing in a single 8 KB shared buffer page (`Heap Blocks: exact=1`, `shared hit=1`). Initializing the GIN index structure and constructing a bitmap carries a baseline cost of ~17.24, making sequential scanning the mathematically rational choice for small datasets.
+   - **Forced Index Plan (`SET enable_seqscan = off`):** Disabling sequential scans forces PostgreSQL to utilize the GIN index, executing a `Bitmap Heap Scan` via `Bitmap Index Scan on idx_scans_bids_metadata_gin` (cost 17.24..22.61, actual time 0.013 ms, `shared hit=5` buffers). This confirms that the GIN index is fully functional and ready to accelerate lookups as data scales to production volumes.
+4. Subcortical volumetry and cortical parcellation array unnesting were demonstrated using `LATERAL jsonb_array_elements()`, producing outputs identical to MongoDB's `$unwind` within 0.45 ms execution time.
 
 ---
 

@@ -1,6 +1,6 @@
 ============================================================================
 ANRDMS NOSQL DOCUMENT MODEL & AGGREGATION PIPELINE SUITE
-Execution Timestamp: 2026-11-14 21:01:55
+Execution Timestamp: 2026-11-14 23:20:36
 Data Model: MongoDB BSON / BIDS Document Specification v1.9.0
 ============================================================================
 
@@ -10,10 +10,10 @@ Data Model: MongoDB BSON / BIDS Document Specification v1.9.0
     Loaded 4 hierarchical computational metrics documents.
 
 ============================================================================
-STAGE 1: DOCUMENT SCHEMA VALIDATION ($jsonSchema COMPLIANCE)
+STAGE 1: DOCUMENT SCHEMA VALIDATION AUDIT (BIDS-INSPIRED SPECIFICATION)
 ============================================================================
-[+] Verified 8/8 scans strictly satisfy the BIDS $jsonSchema validation rules.
-    Enforced constraints: Primary key pattern, BIDS hierarchy, magnetic field range [0.2T, 7.5T].
+[+] Verified 8/8 scans satisfy document keys and sequence type enumeration.
+    Note: Full regex patterns, BSON types, and field range constraints [0.2T - 7.5T] are enforced natively by MongoDB's $jsonSchema engine.
 
 ============================================================================
 PIPELINE 1: SUBCORTICAL VOLUMETRIC ATROPHY ACROSS CLINICAL COHORTS
@@ -25,7 +25,7 @@ Early-onset Alzheimer's dementia    | 1   | 3120.4         | 3210.1         | 63
 Acute ischemic stroke               | 1   | 4150.2         | 4210.8         | 8361.0       | 32890.6         
 Healthy Control Benchmark           | 1   | 4480.0         | 4550.0         | 9030.0       | 24100.0         
 
---> Clinical Finding: Alzheimer's cohort exhibits profound bilateral hippocampal volume reduction (6,330.5 mm³ vs 9,030.0 mm³ in Controls) with compensatory ventricular enlargement (58,400 mm³ vs 24,100 mm³).
+--> Illustrative Synthetic Demonstration Results: The Alzheimer's synthetic demonstration profile reflects lower bilateral hippocampal volume (6,330.5 mm³ vs 9,030.0 mm³ in Controls) with compensatory ventricular enlargement (58,400 mm³ vs 24,100 mm³). These values illustrate aggregation pipeline logic across synthetic demo records, not clinical population studies.
 
 ============================================================================
 PIPELINE 2: REGIONAL CORTICAL THINNING VIA $unwind & GROUPING
@@ -40,7 +40,7 @@ superiorfrontal      | Early-onset Alzheimer's dementia    | 2        | 2.39    
 superiorfrontal      | Acute ischemic stroke               | 2        | 2.77       | [2.76 - 2.78]
 superiorfrontal      | Healthy Control Benchmark           | 2        | 2.835      | [2.82 - 2.85]
 
---> Neuropathological Finding: Entorhinal cortex in early Alzheimer's exhibits pronounced cortical thinning (2.665 mm vs 3.565 mm in Controls, ~25.2% reduction).
+--> Illustrative Synthetic Demonstration Results: Entorhinal cortex in the synthetic Alzheimer's demo document reflects localized cortical thinning (2.665 mm vs 3.565 mm in Controls, demonstrating $unwind array deconstruction).
 
 ============================================================================
 PIPELINE 3: HARDWARE & HIGH-DIMENSIONAL BIDS ACQUISITION MATCHING
@@ -57,12 +57,13 @@ PIPELINE 4: MULTI-STAGE $facet DUAL-BRANCH ANALYTICS DASHBOARD
 Branch A: HPC Cluster Compute Resource Usage | Branch B: Topological Surface Quality
 ============================================================================
 --- FACET 1: HPC Cluster Computational Profile by Pipeline ---
-Pipeline        | Jobs Run | Avg Runtime (Hours)    | Avg Peak RAM (GB) 
+Pipeline        | Jobs Run | Avg Runtime (Hours)    | Avg Peak RAM (GiB)
 ----------------------------------------------------------------------
 FreeSurfer      | 3        | 7.45                   | 11.62             
 FSL-TBSS        | 1        | 3.94                   | 8.20              
 
---- FACET 2: FreeSurfer Topological Surface Quality (Euler Numbers & Defects) ---
+--- FACET 2: FreeSurfer Cortical Mesh Reconstruction Quality (Euler Numbers & Defects) ---
+    (Quality Note: Euler numbers measure geometric mesh topological defects/holes, serving as reconstruction QA metrics)
 Clinical Condition                  | Avg LH Euler   | Avg RH Euler   | Repaired Holes   | Avg CNR 
 -----------------------------------------------------------------------------------------------
 Acute ischemic stroke               | -2             | -4             | 3                | 8.42    

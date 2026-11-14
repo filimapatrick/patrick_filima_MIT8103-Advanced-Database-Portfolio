@@ -48,18 +48,18 @@ def run_nosql_pipeline_suite():
     log(f"    Loaded {len(metrics)} hierarchical computational metrics documents.\n")
 
     # ========================================================================
-    # 1. SCHEMA VALIDATION AUDIT ($jsonSchema ENFORCEMENT)
+    # 1. DOCUMENT SCHEMA VALIDATION AUDIT
     # ========================================================================
     log("============================================================================")
-    log("STAGE 1: DOCUMENT SCHEMA VALIDATION ($jsonSchema COMPLIANCE)")
+    log("STAGE 1: DOCUMENT SCHEMA VALIDATION AUDIT (BIDS-INSPIRED SPECIFICATION)")
     log("============================================================================")
     required_scan_keys = ["scan_id", "participant_id", "site_id", "modality", "sequence_type", "bids_metadata", "scanner_hardware"]
     valid_count = 0
     for s in scans:
         if all(k in s for k in required_scan_keys) and s["sequence_type"] in ["T1w", "T2w", "FLAIR", "dMRI", "fMRI-rest", "fMRI-task", "MRA"]:
             valid_count += 1
-    log(f"[+] Verified {valid_count}/{len(scans)} scans strictly satisfy the BIDS $jsonSchema validation rules.")
-    log("    Enforced constraints: Primary key pattern, BIDS hierarchy, magnetic field range [0.2T, 7.5T].\n")
+    log(f"[+] Verified {valid_count}/{len(scans)} scans satisfy document keys and sequence type enumeration.")
+    log("    Note: Full regex patterns, BSON types, and field range constraints [0.2T - 7.5T] are enforced natively by MongoDB's $jsonSchema engine.\n")
 
     # ========================================================================
     # 2. PIPELINE 1: SUBCORTICAL VOLUMETRIC ATROPHY ACROSS CLINICAL COHORTS
@@ -97,7 +97,7 @@ def run_nosql_pipeline_suite():
     log("-" * 105)
     for r in p1_results:
         log(f"{r['clinical_condition']:<35} | {r['scans_analyzed']:<3} | {r['avg_left_hippocampus_mm3']:<14} | {r['avg_right_hippocampus_mm3']:<14} | {r['bilateral_hippocampus_total_mm3']:<12} | {r['avg_ventricular_volume_mm3']:<16}")
-    log("\n--> Clinical Finding: Alzheimer's cohort exhibits profound bilateral hippocampal volume reduction (6,330.5 mm³ vs 9,030.0 mm³ in Controls) with compensatory ventricular enlargement (58,400 mm³ vs 24,100 mm³).\n")
+    log("\n--> Illustrative Synthetic Demonstration Results: The Alzheimer's synthetic demonstration profile reflects lower bilateral hippocampal volume (6,330.5 mm³ vs 9,030.0 mm³ in Controls) with compensatory ventricular enlargement (58,400 mm³ vs 24,100 mm³). These values illustrate aggregation pipeline logic across synthetic demo records, not clinical population studies.\n")
 
     # ========================================================================
     # 3. PIPELINE 2: CORTICAL THINNING ANALYSIS VIA $unwind
@@ -133,7 +133,7 @@ def run_nosql_pipeline_suite():
     log("-" * 100)
     for r in p2_results:
         log(f"{r['anatomical_region']:<20} | {r['clinical_condition']:<35} | {r['sample_hemispheres']:<8} | {r['mean_thickness_mm']:<10} | [{r['min_thickness_mm']} - {r['max_thickness_mm']}]")
-    log("\n--> Neuropathological Finding: Entorhinal cortex in early Alzheimer's exhibits pronounced cortical thinning (2.665 mm vs 3.565 mm in Controls, ~25.2% reduction).\n")
+    log("\n--> Illustrative Synthetic Demonstration Results: Entorhinal cortex in the synthetic Alzheimer's demo document reflects localized cortical thinning (2.665 mm vs 3.565 mm in Controls, demonstrating $unwind array deconstruction).\n")
 
     # ========================================================================
     # 4. PIPELINE 3: HARDWARE & HIGH-DIMENSIONAL BIDS ACQUISITION QUERY
@@ -183,7 +183,7 @@ def run_nosql_pipeline_suite():
         pipe_perf[pname]["count"] += 1
 
     log("--- FACET 1: HPC Cluster Computational Profile by Pipeline ---")
-    log(f"{'Pipeline':<15} | {'Jobs Run':<8} | {'Avg Runtime (Hours)':<22} | {'Avg Peak RAM (GB)':<18}")
+    log(f"{'Pipeline':<15} | {'Jobs Run':<8} | {'Avg Runtime (Hours)':<22} | {'Avg Peak RAM (GiB)':<18}")
     log("-" * 70)
     for pname, d in pipe_perf.items():
         avg_rt = sum(d["runtime_hrs"]) / d["count"]
@@ -191,7 +191,8 @@ def run_nosql_pipeline_suite():
         log(f"{pname:<15} | {d['count']:<8} | {avg_rt:<22.2f} | {avg_ram:<18.2f}")
 
     # Branch B: Quality
-    log("\n--- FACET 2: FreeSurfer Topological Surface Quality (Euler Numbers & Defects) ---")
+    log("\n--- FACET 2: FreeSurfer Cortical Mesh Reconstruction Quality (Euler Numbers & Defects) ---")
+    log("    (Quality Note: Euler numbers measure geometric mesh topological defects/holes, serving as reconstruction QA metrics)")
     log(f"{'Clinical Condition':<35} | {'Avg LH Euler':<14} | {'Avg RH Euler':<14} | {'Repaired Holes':<16} | {'Avg CNR':<8}")
     log("-" * 95)
     for m in metrics:

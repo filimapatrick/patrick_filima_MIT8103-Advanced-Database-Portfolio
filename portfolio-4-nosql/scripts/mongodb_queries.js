@@ -9,24 +9,29 @@
 // System: African Neuroimaging Research Data Management System (ANRDMS)
 // Target Engine: MongoDB 6.0+ / mongosh
 // Description: MongoDB schema validation, compound and multikey indexing,
+//              negative validation tests, multikey execution plan capture,
 //              and advanced multi-stage aggregation pipelines for BIDS metadata.
 // ============================================================================
 
-// Switch to ANRDMS NoSQL database
-use anrdms_nosql;
+// Switch to ANRDMS NoSQL database (compatible with non-interactive mongosh execution)
+db = db.getSiblingDB("anrdms_nosql");
 
-// Drop collections if they exist to ensure clean re-runs
+// Drop collections if they exist to ensure clean, reproducible re-runs
 db.scans_bids.drop();
 db.pipeline_metrics.drop();
 
 // ============================================================================
 // 1. SCHEMA VALIDATION WITH $jsonSchema (DOCUMENT GOVERNANCE)
 // ============================================================================
-// Demonstrates that NoSQL is "schema-flexible" rather than "schema-less".
-// Enforces mandatory clinical and BIDS identifiers while permitting polymorphic
-// sequence-specific parameters (e.g. diffusion vs functional protocols).
+// Demonstrates that NoSQL in enterprise research is "schema-flexible" rather than
+// "schema-less". Enforces mandatory research governance, participant identifiers,
+// and physical scanner parameters (e.g. magnetic field 0.2T - 7.5T) while permitting
+// sequence-specific polymorphic metadata (e.g. diffusion shells vs fMRI slice timing).
 // ============================================================================
 
+print("=== 1. CREATING COLLECTIONS WITH STRICT $jsonSchema VALIDATION ===");
+
+// Collection 1: scans_bids
 db.createCollection("scans_bids", {
   validator: {
     $jsonSchema: {
@@ -41,7 +46,7 @@ db.createCollection("scans_bids", {
         participant_id: {
           bsonType: "string",
           pattern: "^ANRDMS-[A-Z]{3}-[0-9]{3}$",
-          description: "Must be a valid participant identifier"
+          description: "Must be a valid participant identifier conforming to site prefix"
         },
         site_id: {
           bsonType: "string",
@@ -59,7 +64,7 @@ db.createCollection("scans_bids", {
               bsonType: ["double", "int", "decimal"],
               minimum: 0.2,
               maximum: 7.5,
-              description: "Static magnetic field strength in Tesla"
+              description: "Static magnetic field strength in Tesla (valid range: 0.2T - 7.5T)"
             }
           }
         }
@@ -68,9 +73,63 @@ db.createCollection("scans_bids", {
   }
 });
 
+// Collection 2: pipeline_metrics
+db.createCollection("pipeline_metrics", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["metric_id", "scan_id", "pipeline_info", "execution_metrics"],
+      properties: {
+        metric_id: {
+          bsonType: "string",
+          pattern: "^MET-[A-Z0-9-]+$",
+          description: "Must be a valid ANRDMS metric identifier"
+        },
+        scan_id: {
+          bsonType: "string",
+          pattern: "^SCN-[A-Z]{3}-[0-9]{3}-[A-Z0-9]+$",
+          description: "Foreign key reference to scan identifier"
+        },
+        pipeline_info: {
+          bsonType: "object",
+          required: ["pipeline_name"],
+          properties: {
+            pipeline_name: {
+              enum: ["FreeSurfer", "FSL-TBSS", "QSIPrep", "fMRIPrep", "ANTs"],
+              description: "Standard neuroimaging pipeline name"
+            },
+            version: {
+              bsonType: "string"
+            }
+          }
+        },
+        execution_metrics: {
+          bsonType: "object",
+          required: ["runtime_seconds", "peak_ram_mb"],
+          properties: {
+            runtime_seconds: {
+              bsonType: ["int", "double", "decimal"],
+              minimum: 0,
+              description: "Execution wall-clock time in seconds"
+            },
+            peak_ram_mb: {
+              bsonType: ["int", "double", "decimal"],
+              minimum: 0,
+              description: "Peak RAM consumption in megabytes"
+            }
+          }
+        }
+      }
+    }
+  }
+});
+print("Collections scans_bids and pipeline_metrics created with validator constraints.");
+
 // ============================================================================
 // 2. INDEXING STRATEGY (MULTIKEY, COMPOUND & SPARSE INDEXES)
 // ============================================================================
+
+print("\n=== 2. CREATING SPECIALIZED NOSQL INDEXES ===");
 
 // Index 1: Unique primary key index on BIDS scan_id
 db.scans_bids.createIndex({ "scan_id": 1 }, { unique: true, name: "idx_scans_scan_id_unique" });
@@ -105,16 +164,135 @@ db.pipeline_metrics.createIndex(
   { sparse: true, name: "idx_metrics_compute_node_sparse" }
 );
 
+print("Created 6 indexes across scans_bids and pipeline_metrics collections.");
 
 // ============================================================================
-// 3. ADVANCED AGGREGATION PIPELINES
+// 3. AUTOMATED DOCUMENT INGESTION
 // ============================================================================
+
+print("\n=== 3. INGESTING HETEROGENEOUS BIDS DOCUMENTS ===");
+
+const fs = require("fs");
+const path = require("path");
+
+function loadJsonDocument(fileName) {
+  const candidatePaths = [
+    path.join(__dirname, "..", "documents", fileName),
+    path.join("portfolio-4-nosql", "documents", fileName),
+    path.join("/Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-4-nosql/documents", fileName)
+  ];
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      return JSON.parse(fs.readFileSync(p, "utf8"));
+    }
+  }
+  throw new Error("Could not find document file: " + fileName);
+}
+
+const scansData = loadJsonDocument("scans_bids.json");
+const metricsData = loadJsonDocument("pipeline_metrics.json");
+
+const scansResult = db.scans_bids.insertMany(scansData);
+print("Successfully imported " + scansResult.insertedIds.length + " documents into scans_bids.");
+
+const metricsResult = db.pipeline_metrics.insertMany(metricsData);
+print("Successfully imported " + metricsResult.insertedIds.length + " documents into pipeline_metrics.");
+
+// ============================================================================
+// 4. NEGATIVE VALIDATION TESTS (GOVERNANCE & CONSTRAINT VERIFICATION)
+// ============================================================================
+
+print("\n=== 4. EXECUTING NEGATIVE VALIDATION TESTS ===");
+
+// Test 1: Invalid static magnetic field strength (20.0T > 7.5T maximum threshold)
+print("\n--- Negative Test 1: $jsonSchema Field Range Violation ---");
+print("Attempting to insert scan with 20.0 Tesla magnetic field (limit: 0.2T - 7.5T)...");
+try {
+  db.scans_bids.insertOne({
+    scan_id: "SCN-ERR-999-T1",
+    participant_id: "ANRDMS-LOS-001",
+    site_id: "SITE-LOS-01",
+    modality: "MRI",
+    sequence_type: "T1w",
+    bids_metadata: { bids_version: "1.9.0" },
+    scanner_hardware: {
+      vendor: "Hypothetical Magnets",
+      model: "Ultra-20T",
+      magnetic_field_tesla: 20.0
+    }
+  });
+  print("FAILURE: Document was accepted when schema should have rejected it!");
+} catch (err) {
+  print("EXPECTED REJECTION: Document failed $jsonSchema validation constraint.");
+  print("Error code: " + err.code);
+  print("Error name: " + err.name);
+}
+
+// Test 2: Duplicate scan_id (Unique Index Constraint Violation)
+print("\n--- Negative Test 2: Unique Index Violation ---");
+print("Attempting to insert duplicate scan_id 'SCN-LOS-001-T1'...");
+try {
+  db.scans_bids.insertOne({
+    scan_id: "SCN-LOS-001-T1",
+    participant_id: "ANRDMS-LOS-001",
+    site_id: "SITE-LOS-01",
+    modality: "MRI",
+    sequence_type: "T1w",
+    bids_metadata: { bids_version: "1.9.0" },
+    scanner_hardware: {
+      vendor: "Siemens Healthineers",
+      model: "Magnetom Skyra",
+      magnetic_field_tesla: 3.0
+    }
+  });
+  print("FAILURE: Duplicate document was accepted!");
+} catch (err) {
+  print("EXPECTED REJECTION: Duplicate key rejected by unique index idx_scans_scan_id_unique.");
+  print("Error code: " + err.code);
+  print("Error message: " + err.message);
+}
+
+// ============================================================================
+// 5. MULTIKEY INDEX QUERY EXECUTION PLAN (EXPLAIN EXECUTIONSTATS)
+// ============================================================================
+
+print("\n=== 5. MULTIKEY INDEX QUERY EXECUTION PLAN ===");
+print("Analyzing execution plan for query on array element: diffusion_protocol.b_values = 2000");
+
+const plan = db.scans_bids.find({ "diffusion_protocol.b_values": 2000 }).explain("executionStats");
+
+print("\nQuery Planner Winning Plan:");
+printjson({
+  stage: plan.queryPlanner.winningPlan.stage,
+  inputStage: plan.queryPlanner.winningPlan.inputStage ? {
+    stage: plan.queryPlanner.winningPlan.inputStage.stage,
+    indexName: plan.queryPlanner.winningPlan.inputStage.indexName,
+    isMultiKey: plan.queryPlanner.winningPlan.inputStage.isMultiKey
+  } : null
+});
+
+print("\nExecution Stats Summary:");
+printjson({
+  executionSuccess: plan.executionStats.executionSuccess,
+  nReturned: plan.executionStats.nReturned,
+  totalKeysExamined: plan.executionStats.totalKeysExamined,
+  totalDocsExamined: plan.executionStats.totalDocsExamined,
+  executionTimeMillis: plan.executionStats.executionTimeMillis
+});
+
+
+// ============================================================================
+// 6. ADVANCED AGGREGATION PIPELINES
+// ============================================================================
+
+print("\n=== 6. EXECUTING ADVANCED AGGREGATION PIPELINES ===");
 
 // ----------------------------------------------------------------------------
 // PIPELINE 1: Subcortical Volumetric Atrophy across Clinical Cohorts
 // Goal: Compare mean hippocampal volumes between Alzheimer's, Stroke, and Controls.
 // ----------------------------------------------------------------------------
-db.pipeline_metrics.aggregate([
+print("\n--- Pipeline 1: Subcortical Volumetric Atrophy across Clinical Cohorts ---");
+const p1Results = db.pipeline_metrics.aggregate([
   {
     $match: {
       "subcortical_structures": { $exists: true }
@@ -146,13 +324,15 @@ db.pipeline_metrics.aggregate([
   {
     $sort: { bilateral_hippocampus_total_mm3: 1 } // Lower volumes indicate higher neurodegenerative atrophy
   }
-]);
+]).toArray();
+printjson(p1Results);
 
 // ----------------------------------------------------------------------------
 // PIPELINE 2: Cortical Thinning Analysis via $unwind
 // Goal: Measure localized cortical thinning in entorhinal cortex across cohorts.
 // ----------------------------------------------------------------------------
-db.pipeline_metrics.aggregate([
+print("\n--- Pipeline 2: Regional Cortical Thinning Analysis via $unwind ---");
+const p2Results = db.pipeline_metrics.aggregate([
   {
     $match: {
       "cortical_parcellations": { $exists: true }
@@ -192,13 +372,15 @@ db.pipeline_metrics.aggregate([
   {
     $sort: { anatomical_region: 1, mean_thickness_mm: 1 }
   }
-]);
+]).toArray();
+printjson(p2Results);
 
 // ----------------------------------------------------------------------------
 // PIPELINE 3: Hardware & High-Dimensional BIDS Acquisition Query
 // Goal: Filter multi-shell dMRI acquisitions with b-value=2000 on >=3.0T scanners.
 // ----------------------------------------------------------------------------
-db.scans_bids.aggregate([
+print("\n--- Pipeline 3: Hardware & High-Dimensional BIDS Acquisition Query ---");
+const p3Results = db.scans_bids.aggregate([
   {
     $match: {
       "modality": "MRI",
@@ -220,13 +402,15 @@ db.scans_bids.aggregate([
       phase_encoding: "$acquisition_parameters.phase_encoding_direction"
     }
   }
-]);
+]).toArray();
+printjson(p3Results);
 
 // ----------------------------------------------------------------------------
 // PIPELINE 4: Multi-Stage $facet Operational Analytics Dashboard
 // Goal: Generate HPC compute performance and topological quality metrics in 1 pass.
 // ----------------------------------------------------------------------------
-db.pipeline_metrics.aggregate([
+print("\n--- Pipeline 4: Multi-Stage $facet Operational Analytics Dashboard ---");
+const p4Results = db.pipeline_metrics.aggregate([
   {
     $facet: {
       "hpc_performance_by_pipeline": [
@@ -272,4 +456,6 @@ db.pipeline_metrics.aggregate([
       ]
     }
   }
-]);
+]).toArray();
+printjson(p4Results);
+print("\n=== MONGODB EXECUTION COMPLETE ===");

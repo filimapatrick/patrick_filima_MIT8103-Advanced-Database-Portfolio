@@ -24,10 +24,11 @@ DROP TABLE IF EXISTS scans_bids_jsonb CASCADE;
 DROP TABLE IF EXISTS pipeline_metrics_jsonb CASCADE;
 
 -- Scans table combining relational primary keys with a flexible BIDS document payload
+-- Foreign keys link directly to core relational backbone (participants & research_sites)
 CREATE TABLE scans_bids_jsonb (
     scan_id VARCHAR(30) PRIMARY KEY,
-    participant_id VARCHAR(25) NOT NULL,
-    site_id VARCHAR(15) NOT NULL,
+    participant_id VARCHAR(25) NOT NULL REFERENCES participants(participant_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    site_id VARCHAR(15) NOT NULL REFERENCES research_sites(site_id) ON UPDATE CASCADE ON DELETE RESTRICT,
     sequence_type VARCHAR(25) NOT NULL,
     acquisition_date TIMESTAMPTZ NOT NULL,
     metadata JSONB NOT NULL,
@@ -218,6 +219,17 @@ VALUES
 
 -- Query 1: JSON Containment Operator (@>) Accelerated by GIN Index
 -- Find all scans acquired on a Siemens 3.0T scanner
+-- 
+-- Query Planning Analysis:
+-- With small tables (4 demonstration records residing in 1 disk/buffer page), PostgreSQL's
+-- cost-based optimizer rationally chooses a Sequential Scan (estimated cost 1.05) rather than
+-- a Bitmap Index Scan via idx_scans_bids_metadata_gin (estimated cost 12.05).
+-- Initializing the GIN index structure, scanning index posting lists, and constructing a bitmap
+-- incurs higher startup overhead than scanning four contiguous tuples on a single cached page.
+-- Below, we show both the default cost-based plan and the plan when sequential scans are disabled
+-- (simulating behavior on a scaled production corpus where index selectivity dominates).
+
+\echo '=== Query 1: Default Optimizer Plan (Sequential Scan on 4-row demonstration seed) ==='
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT 
     scan_id,
@@ -227,6 +239,19 @@ SELECT
     (metadata->'scanner_hardware'->>'magnetic_field_tesla')::numeric AS field_tesla
 FROM scans_bids_jsonb
 WHERE metadata @> '{"scanner_hardware": {"vendor": "Siemens Healthineers", "magnetic_field_tesla": 3.0}}';
+
+\echo '=== Query 1: Forced Index Plan (Bitmap Index Scan via GIN jsonb_path_ops) ==='
+SET enable_seqscan = off;
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT 
+    scan_id,
+    participant_id,
+    site_id,
+    metadata->'scanner_hardware'->>'model' AS scanner_model,
+    (metadata->'scanner_hardware'->>'magnetic_field_tesla')::numeric AS field_tesla
+FROM scans_bids_jsonb
+WHERE metadata @> '{"scanner_hardware": {"vendor": "Siemens Healthineers", "magnetic_field_tesla": 3.0}}';
+SET enable_seqscan = on;
 
 -- Query 2: Subcortical Volumetric Aggregation across Polymorphic Records
 -- Extract left and right hippocampal volumes and compute total bilateral volume
