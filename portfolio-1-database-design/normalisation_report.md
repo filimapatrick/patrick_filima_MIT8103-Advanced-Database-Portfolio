@@ -96,6 +96,10 @@ We decompose $\text{FLAT\_1NF}$ into distinct relations corresponding to the det
 #### Evaluation:
 Partial dependencies are completely resolved. However, transitive dependencies still remain.
 
+> [!NOTE]
+> **Refinement of Processing Jobs Functional Dependency:**  
+> The initial 1NF and 2NF examples assume a single processing attempt for each scan and pipeline combination ($(\text{ScanID}, \text{PipelineID}) \to \text{JobStatus}$). This simplifying assumption is relaxed in the final relational schema to support repeated processing attempts, algorithmic parameter tuning, retries, and execution history (e.g., job 101 failing due to out-of-memory and job 102 subsequently succeeding). Consequently, the final `processing_jobs` relation adopts the surrogate primary key $\underline{\text{job\_id}}$, where $\text{job\_id}$ determines $\text{scan\_id}, \text{pipeline\_id}, \text{status}, \text{exit\_code}$, and associated execution metadata. The composite attribute pair $(\text{scan\_id}, \text{pipeline\_id})$ is intentionally non-unique in the physical implementation to retain the complete execution history.
+
 ---
 
 ### 4. Third Normal Form (3NF)

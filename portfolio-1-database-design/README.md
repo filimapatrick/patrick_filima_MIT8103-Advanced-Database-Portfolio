@@ -48,7 +48,7 @@ The ANRDMS relational model comprises **11 interconnected entities** designed to
 ```mermaid
 erDiagram
     RESEARCH_SITES ||--o{ MRI_SCANNERS : "houses"
-    RESEARCH_SITES ||--o{ RESEARCHERS : "employs / affiliates"
+    RESEARCH_SITES |o--o{ RESEARCHERS : "employs / affiliates"
     RESEARCH_SITES ||--o{ PARTICIPANTS : "recruits / primary site"
     
     RESEARCHERS ||--o{ RESEARCH_PROJECTS : "leads as PI"
@@ -208,7 +208,7 @@ erDiagram
 
 ## 4. Relational Schema & Constraint Architecture
 
-The database schema is implemented in PostgreSQL 14+ via [`schema.sql`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/schema.sql). The design enforces rigorous database integrity constraints:
+The database schema is implemented in PostgreSQL 14+ via [`schema.sql`](./schema.sql). The design enforces rigorous database integrity constraints:
 
 ### 4.1 Key Constraints & Cardinalities
 1. **Entity Integrity (Primary Keys):** Every table possesses an unambiguous primary key (`site_id`, `scanner_id`, `participant_id`, `scan_id`, or surrogate `BIGSERIAL` identifiers for high-volume execution logs like `job_id` and `qc_id`).
@@ -217,8 +217,8 @@ The database schema is implemented in PostgreSQL 14+ via [`schema.sql`](file:///
    * `ON DELETE CASCADE` is reserved for dependent associative and derivative tables (`participant_diagnoses`, `processing_jobs`, `qc_evaluations`), ensuring that if a corrupted scan record is expunged, its child jobs and QC ratings are cleanly removed without leaving orphan records.
 3. **Domain & Check Constraints:**
    * **Physics & Protocol Checks:** $TR > 0$, $TE > 0$, $0^\circ < \text{flip\_angle} \le 180^\circ$, positive voxel dimensions.
-   * **Magnetic Field Strengths:** Restricted to clinical and research standards: $B_0 \in \{1.5, 3.0, 7.0\}\text{ Tesla}$.
-   * **Ethical Guardrails:** `CHECK (consent_obtained IS TRUE)` ensures no unconsented participant can exist in active study queries.
+   * **Magnetic Field Strengths:** Restricted to clinical and research standards: $B_0 \in \{0.3, 1.5, 3.0, 7.0\}\text{ Tesla}$ (accommodating low-field Nigerian scanners through 7T research magnets).
+   * **Ethical Guardrails:** `CHECK (consent_obtained IS TRUE)` with no default assumption (must be explicitly attested by researcher).
    * **Chronological Integrity:** Enforces `end_time >= start_time >= submission_time` for computational batch jobs.
 4. **Unique Constraints:**
    * `dicom_series_uid`: Guarantees international medical uniqueness of DICOM series.
@@ -237,7 +237,7 @@ The relational schema was developed by decomposing a flat unnormalised scanner a
 * **BCNF:** Audited every functional dependency $X \to Y$ to prove that determinant $X$ is strictly a superkey across all 11 relations.
 
 > [!NOTE]
-> For the comprehensive mathematical treatise, formal functional dependency proofs, closure calculations, and lossless-join theorems, please refer to the dedicated [`normalisation_report.md`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/normalisation_report.md).
+> For the comprehensive mathematical treatise, formal functional dependency proofs, closure calculations, and lossless-join theorems, please refer to the dedicated [`normalisation_report.md`](./normalisation_report.md).
 
 ---
 
@@ -293,15 +293,15 @@ SELECT 'qc_evaluations', count(*) FROM qc_evaluations;
 | `qc_evaluations` | 20 | Quantitative image quality metrics (SNR, CNR, FD motion) |
 
 > [!NOTE]
-> For complete terminal transcripts, execution logs, and empirical constraint violation tests (CHECK, FK, UNIQUE, and Consent guardrails), see [`verification_evidence.md`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/verification_evidence.md).
+> For complete terminal transcripts, execution logs, and empirical constraint violation tests (CHECK, FK, UNIQUE, and Consent guardrails), see [`verification_evidence.md`](./verification_evidence.md).
 
 ---
 
 ## 7. Portfolio Artifact Manifest
 
-* [`schema.sql`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/schema.sql): Complete PostgreSQL DDL schema definition script with comments, constraints, and indexes.
-* [`seed_data.sql`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/seed_data.sql): Synthetic data script populating 11 tables with realistic multi-site Nigerian neuroimaging records.
-* [`er_diagram.mermaid`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/er_diagram.mermaid): Standalone Mermaid source code for the Entity-Relationship Diagram.
-* [`data_dictionary.md`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/data_dictionary.md): Field-by-field specifications of attributes, domains, keys, and descriptions.
-* [`normalisation_report.md`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/normalisation_report.md): Formal academic normalisation analysis (UNF through BCNF) with anomaly proofs and lossless-join guarantees.
-* [`verification_evidence.md`](file:///Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-1-database-design/verification_evidence.md): Empirical test output, table catalogs, row count audits, and constraint violation proofs.
+* [`schema.sql`](./schema.sql): Complete PostgreSQL DDL schema definition script with comments, constraints, and indexes.
+* [`seed_data.sql`](./seed_data.sql): Synthetic data script populating 11 tables with realistic multi-site Nigerian neuroimaging records.
+* [`er_diagram.mermaid`](./er_diagram.mermaid): Standalone Mermaid source code for the Entity-Relationship Diagram.
+* [`data_dictionary.md`](./data_dictionary.md): Field-by-field specifications of attributes, domains, keys, and descriptions.
+* [`normalisation_report.md`](./normalisation_report.md): Formal academic normalisation analysis (UNF through BCNF) with anomaly proofs and lossless-join guarantees.
+* [`verification_evidence.md`](./verification_evidence.md): Empirical test output, table catalogs, row count audits, and constraint violation proofs.

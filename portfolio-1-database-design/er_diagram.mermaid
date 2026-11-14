@@ -1,7 +1,6 @@
-```mermaid
 erDiagram
     RESEARCH_SITES ||--o{ MRI_SCANNERS : "houses"
-    RESEARCH_SITES ||--o{ RESEARCHERS : "employs / affiliates"
+    RESEARCH_SITES |o--o{ RESEARCHERS : "employs / affiliates"
     RESEARCH_SITES ||--o{ PARTICIPANTS : "recruits / primary site"
     
     RESEARCHERS ||--o{ RESEARCH_PROJECTS : "leads as PI"
@@ -165,4 +164,3 @@ erDiagram
         text artifact_notes
         timestamptz created_at
     }
-```

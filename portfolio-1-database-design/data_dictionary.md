@@ -6,6 +6,9 @@
 **Student:** Patrick Filima  
 **Target DBMS:** PostgreSQL 14+  
 
+> [!NOTE]
+> **Neuroimaging Data Scope Notice:** ANRDMS stores structured imaging metadata, pulse sequence acquisition parameters, clinical phenotypic attributes, and Brain Imaging Data Structure (BIDS) relative directory paths (`bids_relative_path`). High-volume 3D/4D binary imaging volumes (raw DICOM archives, NIfTI `.nii.gz` files, and derivative surfaces) reside on external file/object storage systems (e.g., local Ceph/NFS clusters or Cloud Object Storage), linked deterministically through this relational database catalog.
+
 ---
 
 ### Entity Index
@@ -50,7 +53,7 @@
 | `site_id` | VARCHAR(15) | NO | **FK** (`research_sites.site_id`) | — | Location where scanner is installed. |
 | `manufacturer` | VARCHAR(50) | NO | — | — | Scanner vendor (`Siemens Healthineers`, `GE Healthcare`, `Philips Healthcare`). |
 | `model_name` | VARCHAR(80) | NO | — | — | Model designation (`MAGNETOM Skyra`, `Signa Explorer`). |
-| `magnetic_field_strength_tesla` | NUMERIC(3,1) | NO | `CHECK (IN (1.5, 3.0, 7.0))` | — | Static magnetic field strength ($B_0$) in Tesla. |
+| `magnetic_field_strength_tesla` | NUMERIC(3,1) | NO | `CHECK (IN (0.3, 1.5, 3.0, 7.0))` | — | Static magnetic field strength ($B_0$) in Tesla (supports 0.3T low-field to 7.0T ultra-high field). |
 | `gradient_strength_mt_m` | NUMERIC(5,2) | NO | `CHECK (> 0)` | — | Peak gradient amplitude ($mT/m$). |
 | `software_version` | VARCHAR(50) | NO | — | — | Console operating software release. |
 | `installation_date` | DATE | NO | — | — | Official commissioning date. |
@@ -104,7 +107,7 @@
 | `biological_sex` | VARCHAR(10) | NO | `CHECK (IN ('Female','Male','Other'))` | — | Phenotypic biological sex. |
 | `handedness` | VARCHAR(15) | NO | `CHECK (IN ('Right','Left','Ambidextrous'))` | `'Right'` | Dominant hand motor preference. |
 | `education_years` | INT | YES | `CHECK (0..30)` | — | Formal completed years of education. |
-| `consent_obtained` | BOOLEAN | NO | `CHECK (consent_obtained IS TRUE)` | `TRUE` | Verified ethical informed consent flag. |
+| `consent_obtained` | BOOLEAN | NO | `CHECK (consent_obtained IS TRUE)` | — | Explicitly verified ethical informed consent flag (NOT NULL, no default assumed). |
 | `created_at` | TIMESTAMPTZ | NO | — | `CURRENT_TIMESTAMP` | Audit timestamp. |
 
 ---
@@ -136,7 +139,7 @@
 | `is_primary_diagnosis` | BOOLEAN | NO | — | `TRUE` | Flags primary study entry indication. |
 | `clinical_notes` | TEXT | YES | — | — | Additional radiological/clinical notes. |
 | `created_at` | TIMESTAMPTZ | NO | — | `CURRENT_TIMESTAMP` | Audit timestamp. |
-| *Composite Unique* | — | — | `UNIQUE (participant_id, diagnosis_code)` | — | Prevents duplicate condition assignment. |
+| *Composite Unique* | — | — | `UNIQUE (participant_id, diagnosis_code)` | — | Current diagnosis constraint (permits one current record per condition). |
 
 ---
 
@@ -217,7 +220,7 @@
 | `overall_quality` | VARCHAR(10) | NO | `CHECK (IN ('PASS','WARN','FAIL'))` | — | Summary qualitative rating. |
 | `snr_score` | NUMERIC(6,2) | NO | `CHECK (snr_score >= 0)` | — | Signal-to-Noise Ratio. |
 | `cnr_score` | NUMERIC(6,2) | NO | `CHECK (cnr_score >= 0)` | — | Contrast-to-Noise Ratio (grey-to-white matter). |
-| `head_motion_fd_mean_mm` | NUMERIC(5,3) | NO | `CHECK (>= 0)` | — | Mean Framewise Displacement in millimeters. |
+| `head_motion_fd_mean_mm` | NUMERIC(5,3) | NO | `CHECK (>= 0)` | — | Mean Framewise Displacement in millimeters (primary motion metric). |
 | `usable_for_analysis` | BOOLEAN | NO | — | `TRUE` | Certification for downstream pipeline entry. |
 | `artifact_notes` | TEXT | YES | — | — | Qualitative findings (e.g. ghosting, ringing). |
 | `created_at` | TIMESTAMPTZ | NO | — | `CURRENT_TIMESTAMP` | Audit timestamp. |

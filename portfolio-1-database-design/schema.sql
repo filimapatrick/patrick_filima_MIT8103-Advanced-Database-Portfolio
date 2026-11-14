@@ -69,7 +69,7 @@ CREATE TABLE mri_scanners (
     CONSTRAINT fk_scanners_site FOREIGN KEY (site_id) 
         REFERENCES research_sites(site_id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT ck_scanners_field_strength CHECK (
-        magnetic_field_strength_tesla IN (1.5, 3.0, 7.0)
+        magnetic_field_strength_tesla IN (0.3, 1.5, 3.0, 7.0)
     ),
     CONSTRAINT ck_scanners_gradient CHECK (gradient_strength_mt_m > 0),
     CONSTRAINT ck_scanners_calibration CHECK (last_calibration_date >= installation_date)
@@ -134,7 +134,7 @@ CREATE TABLE participants (
     biological_sex VARCHAR(10) NOT NULL,
     handedness VARCHAR(15) DEFAULT 'Right' NOT NULL,
     education_years INT,
-    consent_obtained BOOLEAN DEFAULT TRUE NOT NULL,
+    consent_obtained BOOLEAN NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT fk_participants_site FOREIGN KEY (primary_site_id) 
         REFERENCES research_sites(site_id) ON DELETE RESTRICT ON UPDATE CASCADE,

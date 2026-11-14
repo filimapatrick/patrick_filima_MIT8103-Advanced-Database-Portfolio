@@ -8,6 +8,9 @@
 **Database Name:** `anrdms`  
 **Execution Timestamp:** 2026-11-14T17:30:00Z  
 
+> [!NOTE]
+> **Neuroimaging Data Scope Notice:** ANRDMS stores structured imaging metadata, sequence acquisition parameters, clinical phenotypes, and Brain Imaging Data Structure (BIDS) relative directory paths (`bids_relative_path`). Heavy binary 3D/4D imaging volumes (DICOM archives, NIfTI `.nii.gz` files, and derivative surfaces) reside on external file/object storage systems (e.g., local Ceph or Cloud Object Storage), indexed deterministically by this database catalog.
+
 ---
 
 ### 1. Environment & Engine Verification
@@ -96,7 +99,20 @@ CREATE INDEX
 CREATE INDEX
 CREATE INDEX
 ```
-*Result: 11 tables, 15 relational indexes, 24 check constraints, and table comments generated with zero errors.*
+*Result: 11 tables, 65 total constraints (31 check constraints, 15 foreign keys, 11 primary keys, 8 unique constraints), and 34 total indexes (15 explicitly declared secondary indexes + 11 primary key indexes + 8 unique constraint indexes) generated with zero errors.*
+
+```sql
+-- Live verification of constraints and indexes in PostgreSQL:
+SELECT contype, count(*) AS total 
+FROM pg_constraint 
+WHERE connamespace = 'public'::regnamespace 
+GROUP BY contype 
+ORDER BY contype;
+-- Output: c (CHECK) = 31, f (Foreign Key) = 15, p (Primary Key) = 11, u (Unique) = 8. Total = 65.
+
+SELECT count(*) AS total_indexes FROM pg_indexes WHERE schemaname = 'public';
+-- Output: 34 indexes.
+```
 
 ---
 
@@ -251,6 +267,23 @@ ERROR:  new row for relation "participants" violates check constraint "ck_partic
 DETAIL:  Failing row contains (ANRDMS-FAIL-CONSENT, SITE-LOS-01, 2025-01-01, 1980, Female, Right, null, f, 2026-11-14 17:30:39.812513+00).
 ```
 *Verdict: PASSED. Business rule constraint `ck_participants_consent` prevented non-consented participants from being entered into research cohorts.*
+
+---
+
+#### Test 6.5: Entity Integrity (Primary Key) Enforcement
+Attempting to insert a duplicate research site using an existing primary key (`SITE-LOS-01`).
+```sql
+INSERT INTO research_sites (site_id, hospital_name, city, state, tier, contact_email)
+SELECT site_id, hospital_name, city, state, tier, contact_email
+FROM research_sites
+WHERE site_id = 'SITE-LOS-01';
+```
+**Database Engine Response:**
+```
+ERROR:  duplicate key value violates unique constraint "research_sites_pkey"
+DETAIL:  Key (site_id)=(SITE-LOS-01) already exists.
+```
+*Verdict: PASSED. Primary key constraint `research_sites_pkey` strictly prevented entity identity duplication.*
 
 ---
 
