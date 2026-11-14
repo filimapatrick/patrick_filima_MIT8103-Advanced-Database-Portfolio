@@ -1,0 +1,13 @@
+CREATE INDEX
+CREATE INDEX
+   table_name    |           index_name            | index_size | size_bytes 
+-----------------+---------------------------------+------------+------------
+ mri_scans       | idx_scans_seq_date              | 3256 kB    |    3334144
+ processing_jobs | idx_jobs_completed_scan_partial | 1552 kB    |    1589248
+ processing_jobs | tmp_full_jobs                   | 2488 kB    |    2547712
+ qc_evaluations  | idx_qc_pass_usable_partial      | 1448 kB    |    1482752
+ qc_evaluations  | tmp_full_qc                     | 2184 kB    |    2236416
+(5 rows)
+
+DROP INDEX
+DROP INDEX

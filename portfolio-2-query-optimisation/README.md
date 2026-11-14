@@ -65,7 +65,7 @@ The optimisation experiments proceed through the following stages:
 2. **Optimizer Statistics:** Update table distribution statistics using `ANALYZE`.
 3. **Baseline Measurement:** Execute target analytical queries without secondary indexes and record `EXPLAIN (ANALYZE, BUFFERS)` execution plans.
 4. **Index Design & Implementation:** Construct targeted B-Tree, composite, and partial indexes tailored to the query filter and join predicates.
-5. **Post-Optimization Measurement:** Re-run the identical queries under identical cache conditions.
+5. **Post-Optimization Measurement:** Re-run the identical queries against the same benchmark dataset and PostgreSQL environment, acknowledging that cache state may vary.
 6. **Performance Audit:** Compute speedup factors, buffer page reductions, and plan tree changes (`Seq Scan` $\to$ `Index Scan` / `Bitmap Heap Scan`).
 7. **Trade-off Analysis:** Analyze the maintenance overhead and storage footprint of the introduced index structures.
 
@@ -83,6 +83,7 @@ The optimisation experiments proceed through the following stages:
 | [`performance_analysis.md`](./performance_analysis.md) | Quantitative benchmark comparison and performance findings | **Completed** |
 | [`evidence/query_outputs.txt`](./evidence/query_outputs.txt) | Raw execution outputs of the 7 research queries | **Completed** |
 | [`evidence/execution_plan_outputs.txt`](./evidence/execution_plan_outputs.txt) | Raw `EXPLAIN (ANALYZE, BUFFERS)` execution plan logs | **Completed** |
+| [`evidence/index_sizes.txt`](./evidence/index_sizes.txt) | Measured index physical storage & partial index savings | **Completed** |
 
 ---
 

@@ -234,7 +234,7 @@ While secondary indexes dramatically accelerate read latency, database engineeri
    * In typical research workflows, clinical queries disproportionately target *Passed QC* scans or *Completed* processing jobs rather than failed or abandoned attempts.
    * Creating **Partial Indexes** (`WHERE status = 'COMPLETED'`) prevents indexing pending, running, or failed runs. As empirically verified above, this reduced index physical storage by **33.7%** (QC) and **37.6%** (Jobs), while eliminating index update penalties when transient pending jobs are created.
 3. **Covering Indexes for Index-Only Scans:**
-   * When an index contains all attributes requested by a query clause (e.g. `scan_id`), PostgreSQL can satisfy query execution entirely from index leaf pages via an **Index Only Scan**, provided the visibility map confirms no concurrent uncommitted transactions.
+   * When an index contains the attributes required by a query, PostgreSQL can use an Index Only Scan. Heap access can be avoided when the visibility map marks the relevant heap pages as all-visible.
 
 ---
 
@@ -244,3 +244,4 @@ While secondary indexes dramatically accelerate read latency, database engineeri
 * [`indexes.sql`](./indexes.sql): Index creation and removal scripts for controlled A/B testing.
 * [`execution_plans.sql`](./execution_plans.sql): Complete benchmarking script with `EXPLAIN (ANALYZE, BUFFERS)`.
 * [`evidence/execution_plan_outputs.txt`](./evidence/execution_plan_outputs.txt): Full, unedited PostgreSQL 16 terminal execution plan transcripts.
+* [`evidence/index_sizes.txt`](./evidence/index_sizes.txt): Terminal transcript validating measured physical index storage and partial index percentage savings.
