@@ -15,7 +15,11 @@
 
 In clinical and neuroinformatics research platforms, database scalability depends heavily on the interaction between application query patterns and the database cost-based query optimizer. In small development databases (< 1,000 tuples), query optimizers frequently favor sequential table scans (`Seq Scan`) because the overhead of index page lookup and random I/O exceeds sequential block reading. However, when database volume scales to enterprise dimensions (e.g. 100,000+ imaging sessions across regional hospital networks), missing or suboptimal indexes result in severe latency bottlenecks, CPU exhaustion, and disk thrashing.
 
-To evaluate query processing and optimization empirically, an independent benchmark database (`anrdms_benchmark`) was provisioned and populated with **100,036 MRI scan records**, **80,023 compute jobs**, and **70,020 QC evaluations**. Controlled A/B experiments were executed under identical system memory and cache conditions, comparing baseline query performance (unindexed) against targeted index strategies (Composite B-Tree, Partial Indexing, and Index-Only Scans).
+To evaluate query processing and optimization empirically, an independent benchmark database (`anrdms_benchmark`) was provisioned and populated with **100,036 synthetic MRI scan records**, **80,023 compute jobs**, and **70,020 QC evaluations** using PostgreSQL's set-based `generate_series()`. Controlled A/B experiments were executed comparing baseline query performance (unindexed) against targeted index strategies (Composite B-Tree, Partial Indexing, and Index-Only Scans).
+
+> [!NOTE]
+> **Experimental Methodology & Workload Notice:**  
+> The baseline and optimised queries were executed against the same benchmark dataset using the same PostgreSQL environment. Table statistics were refreshed using `ANALYZE` before the experiments. However, cache state was not explicitly controlled, and the recorded execution times represent individual benchmark runs. The results therefore demonstrate observed performance improvements under the tested conditions rather than definitive average performance across all workloads. Furthermore, the 100,000-record benchmark dataset represents a synthetic database workload generated specifically to test query optimizer scaling characteristics, rather than a clinically calibrated multi-modal MRI cohort.
 
 ---
 
@@ -27,11 +31,11 @@ $$\text{Total Cost} = (N_{\text{pages}} \times \text{seq\_page\_cost}) + (N_{\te
 
 Where default PostgreSQL configuration parameters specify:
 * `seq_page_cost = 1.0` (sequential disk block fetch)
-* `random_page_cost = 4.0` (random disk block fetch, reflecting spinning disks or non-cached SSD random seeks)
+* `random_page_cost = 4.0` (random disk block fetch, reflecting non-sequential block reads)
 * `cpu_tuple_cost = 0.01` (CPU processing per record)
 * `cpu_operator_cost = 0.0025` (CPU evaluation per `WHERE` condition or comparison operator)
 
-When an index is absent, PostgreSQL must read every disk page sequentially and evaluate filter predicates across all rows. When an optimal index is constructed, the optimizer navigates balanced B-Tree structures ($O(\log N)$) to locate exact leaf pages, radically reducing block reads and eliminating subsequent in-memory sort phases.
+When an index is absent, PostgreSQL must read every disk page sequentially and evaluate filter predicates across all rows. When an optimal index is constructed, the optimizer navigates balanced B-Tree structures ($O(\log N)$) to locate exact leaf pages, substantially reducing block accesses.
 
 ---
 
@@ -63,7 +67,7 @@ ORDER BY acquisition_date DESC;
           Buffers: shared hit=3227
   Execution Time: 10.314 ms
   ```
-  *Analysis:* The engine performed a full sequential scan across 3,227 buffer pages, discarded 97,686 non-matching rows, and performed an in-memory Quicksort on the remaining 2,350 rows.
+  *Analysis:* The engine performed a full sequential scan across 3,227 shared buffer blocks, discarded 97,686 non-matching rows, and performed an in-memory Quicksort on the remaining 2,350 rows.
 
 * **Targeted Index Strategy:**
   A composite B-Tree index on `(sequence_type, acquisition_date DESC)`:
@@ -83,13 +87,17 @@ ORDER BY acquisition_date DESC;
           Buffers: shared hit=456 read=14
           ->  Bitmap Index Scan on idx_scans_seq_date (cost=0.00..69.72 rows=2344 width=0) (actual time=0.420..0.420 rows=2350 loops=1)
                 Index Cond: ((sequence_type = 'fMRI-rest') AND (acquisition_date >= ...) AND (acquisition_date < ...))
+                Buffers: shared read=14
   Execution Time: 1.298 ms
   ```
 
+* **Why the Sort Remained:**  
+  The composite index successfully eliminated the full-table sequential scan, reducing table page reads from 3,227 to 456 blocks. However, an in-memory Quicksort remained in the plan. A `Bitmap Heap Scan` operates by first building a bitmap of matching tuple TIDs from the index and then visiting table heap pages in physical block order to minimize random disk head movement and optimize I/O locality. Because heap pages are visited in physical storage order rather than B-Tree key order, the sorted sequence of `acquisition_date DESC` is not preserved by the bitmap scan, requiring PostgreSQL to perform an explicit in-memory sort on the resulting 2,350 matching rows.
+
 * **Empirical Gain:**
   * **Execution Time:** Dropped from **10.314 ms** to **1.298 ms** (**7.95x speedup / 87.4% latency drop**).
-  * **Buffer I/O:** Page reads dropped from **3,227 blocks** to **470 blocks** (**85.4% reduction in memory page reads**).
-  * **Planning Mechanism:** `Bitmap Index Scan` isolated exact table pages containing the target sequence and date range, bypassing 97% of the heap data.
+  * **Buffer Accesses:** Shared-buffer page accesses dropped from **3,227 blocks** (all hits) to **470 blocks** (456 hits + 14 reads), representing an **85.4% reduction in shared-buffer block accesses**.
+  * **Index Physical Size:** The resulting composite index measures **3,256 kB** (3.26 MB) in storage.
 
 ---
 
@@ -156,11 +164,11 @@ AND EXISTS (
   Execution Time: 18.100 ms
   ```
 
-* **Empirical Gain:**
-  * **Index-Only Scan:** The partial index satisfies the join condition entirely within index memory (`Heap Fetches: 0`).
-  * **Page Access Reduction:** Buffer reads for `qc_evaluations` plummeted from **1,251 blocks** to **181 blocks** (**85.5% reduction** in QC table block reads).
-  * **Execution Time:** Reduced from **20.822 ms** to **18.100 ms**.
-  * **Storage Benefit:** Because failed and warned scans are excluded from the index predicate, the physical index size is 40% smaller than a full table index.
+* **Index-Only Scan Mechanics & Empirical Gain:**
+  * **Heap Fetches = 0:** PostgreSQL obtained all required `scan_id` values directly from the partial index entries without fetching corresponding heap table tuples. This was possible because the table's visibility map confirmed tuple visibility without requiring heap tuple version checks. (Note that 180 shared reads occurred to load the required index blocks into shared buffers).
+  * **Buffer Access Reduction:** Block accesses for `qc_evaluations` plummeted from **1,251 blocks** to **181 blocks** (**85.5% reduction** in QC table buffer accesses).
+  * **Execution Time:** Reduced from **20.822 ms** to **18.100 ms** (**13.1% reduction**). The improvement is moderate because the large outer table (`mri_scans`) still underwent a sequential scan to filter T1w scans.
+  * **Measured Physical Storage:** The partial index measures **1,448 kB**, compared to **2,184 kB** for an equivalent full-table index on `qc_evaluations(scan_id)`, demonstrating an empirical **33.7% storage saving**.
 
 ---
 
@@ -184,7 +192,7 @@ WHERE NOT EXISTS (
   * `Hash Anti Join` over full sequential scan of `processing_jobs` (80,023 rows, 1,740 buffer blocks) and `mri_scans` (100,036 rows).
   * **Execution Time:** **25.686 ms**
   * **Total Estimated Cost:** **8412.51**
-  * **Buffer Reads:** **4,967 shared blocks**.
+  * **Buffer Accesses:** **4,967 shared blocks**.
 
 * **Targeted Index Strategy:**
   A **Partial Filtered Index** indexing only completed batch jobs:
@@ -196,19 +204,22 @@ WHERE NOT EXISTS (
 
 * **Optimized Execution Plan (With Partial Index):**
   * Plan transitioned to **`Index Only Scan`** on `processing_jobs` (`Heap Fetches: 0`).
-  * **Execution Time:** Dropped to **21.183 ms** (**17.5% latency reduction**).
+  * **Execution Time:** Dropped from **25.686 ms** to **21.183 ms** (**17.5% latency reduction**).
   * **Total Estimated Cost:** Reduced from **8412.51** to **7198.32** (**14.4% cost reduction**).
-  * **Buffer Reads for `processing_jobs`:** Dropped from **1,740 blocks** to **194 blocks** (**88.9% page reduction**).
+  * **Buffer Accesses for `processing_jobs`:** Dropped from **1,740 blocks** to **194 blocks** (**88.9% reduction** in job table block accesses).
+  * **Measured Physical Storage:** The partial index measures **1,552 kB**, compared to **2,488 kB** for an equivalent full index on `processing_jobs(scan_id)`, an empirical **37.6% storage saving**.
 
 ---
 
 ### 4. Consolidated Performance Benchmark Matrix
 
-| Experiment | Target Workload | Index Applied | Scan Type Before | Scan Type After | Buffer Reads Before | Buffer Reads After | Exec Time Before (ms) | Exec Time After (ms) | Speedup Factor | Cost Reduction |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Exp 1** | Temporal Sequence Filtering | Composite B-Tree `(sequence_type, acquisition_date DESC)` | `Seq Scan` + `Quicksort` | `Bitmap Index Scan` | 3,227 blocks | 470 blocks | 10.31 ms | **1.30 ms** | **7.95x** | 34.3% |
-| **Exp 2** | Certified Cohort Retrieval | Partial Index `(scan_id) WHERE PASS AND usable` | `Seq Scan` on QC | `Index Only Scan` (Heap Fetches: 0) | 1,251 blocks (QC) | 181 blocks (QC) | 20.82 ms | **18.10 ms** | **1.15x** | 12.7% |
-| **Exp 3** | Pipeline Backlog Anti-Join | Partial Index `(scan_id) WHERE status = 'COMPLETED'` | `Seq Scan` on Jobs | `Index Only Scan` (Heap Fetches: 0) | 1,740 blocks (Jobs) | 194 blocks (Jobs) | 25.69 ms | **21.18 ms** | **1.21x** | 14.4% |
+| Experiment | Target Workload | Index Applied | Scan Type Before | Scan Type After | Buffer Accesses Before (Blocks) | Buffer Accesses After (Blocks) | Exec Time Before (ms) | Exec Time After (ms) | Speedup Factor | Cost Reduction | Measured Index Size |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Exp 1** | Temporal Sequence Filtering | Composite B-Tree `(sequence_type, acquisition_date DESC)` | `Seq Scan` + `Quicksort` | `Bitmap Index Scan` + `Sort` | 3,227 | 470 | 10.31 ms | **1.30 ms** | **7.95x** | 34.3% | 3,256 kB |
+| **Exp 2** | Certified Cohort Retrieval | Partial Index `(scan_id) WHERE PASS AND usable` | `Seq Scan` on QC | `Index Only Scan` (Heap Fetches: 0) | 1,251 (QC) | 181 (QC) | 20.82 ms | **18.10 ms** | **1.15x** | 12.7% | 1,448 kB *(vs 2,184 kB full)* |
+| **Exp 3** | Pipeline Backlog Anti-Join | Partial Index `(scan_id) WHERE status = 'COMPLETED'` | `Seq Scan` on Jobs | `Index Only Scan` (Heap Fetches: 0) | 1,740 (Jobs) | 194 (Jobs) | 25.69 ms | **21.18 ms** | **1.21x** | 14.4% | 1,552 kB *(vs 2,488 kB full)* |
+
+*Note on Buffer Metrics: "Buffer Accesses" denotes total shared-buffer blocks accessed (shared hits found in memory + shared reads loaded into PostgreSQL shared buffers). A shared read does not necessarily imply a physical disk seek if the host operating system page cache already held the file blocks.*
 
 ---
 
@@ -217,13 +228,13 @@ WHERE NOT EXISTS (
 While secondary indexes dramatically accelerate read latency, database engineering requires balancing retrieval gains against write penalties:
 
 1. **Write Overhead (Insert / Update Penalty):**
-   * Every new scan record inserted into `mri_scans` must update the composite B-Tree `idx_scans_seq_date`.
-   * In a clinical trial streaming 1,000 DICOM acquisitions per hour, maintaining 10+ unselective secondary indexes degrades bulk insert throughput by 20–35%.
+   * Every write operation (`INSERT`, `UPDATE`, `DELETE`) on an indexed table incurs overhead because PostgreSQL must update the underlying table heap and every associated secondary B-Tree structure.
+   * On high-throughput streaming systems (such as high-volume hospital PACS data ingest), maintaining multiple unselective secondary indexes increases Write-Ahead Logging (WAL) volume and causes B-Tree page splits. Indexes should therefore be strictly justified by query frequency and selectivity.
 2. **Partial Index Advantage in Neuroinformatics:**
-   * In ANRDMS, ~80% of analytical workflows search exclusively for *Passed QC* scans or *Completed* processing jobs.
-   * Creating **Partial Indexes** (`WHERE status = 'COMPLETED'`) prevents indexing failed, pending, or obsolete runs. This saves ~30–45% index storage and eliminates write maintenance overhead when pending jobs are created.
+   * In typical research workflows, clinical queries disproportionately target *Passed QC* scans or *Completed* processing jobs rather than failed or abandoned attempts.
+   * Creating **Partial Indexes** (`WHERE status = 'COMPLETED'`) prevents indexing pending, running, or failed runs. As empirically verified above, this reduced index physical storage by **33.7%** (QC) and **37.6%** (Jobs), while eliminating index update penalties when transient pending jobs are created.
 3. **Covering Indexes for Index-Only Scans:**
-   * By ensuring all filtered attributes reside in the index definition, PostgreSQL achieves `Heap Fetches = 0`, satisfying queries entirely in RAM without touching underlying table pages.
+   * When an index contains all attributes requested by a query clause (e.g. `scan_id`), PostgreSQL can satisfy query execution entirely from index leaf pages via an **Index Only Scan**, provided the visibility map confirms no concurrent uncommitted transactions.
 
 ---
 

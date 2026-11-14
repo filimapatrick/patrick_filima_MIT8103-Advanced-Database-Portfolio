@@ -86,15 +86,46 @@ The optimisation experiments proceed through the following stages:
 
 ---
 
-## 7. Academic Integrity & Reproducibility
+## 7. Benchmark Reproduction Instructions
 
-All participant identifiers, acquisition logs, and quality scores used in this portfolio are synthetic and intended solely for academic demonstration in MIT 8103.
+To reproduce the 100,000-record optimization benchmarks on a local PostgreSQL instance from scratch:
+
+```bash
+# 1. Create a dedicated benchmark database
+createdb anrdms_benchmark
+
+# 2. Initialize the relational schema (11 tables and constraints)
+psql -d anrdms_benchmark -v ON_ERROR_STOP=1 \
+  -f portfolio-1-database-design/schema.sql
+
+# 3. Load baseline lookup entities (sites, scanners, pipelines, diagnoses)
+psql -d anrdms_benchmark -v ON_ERROR_STOP=1 \
+  -f portfolio-1-database-design/seed_data.sql
+
+# 4. Generate the high-volume synthetic benchmark dataset (100k scans, 80k jobs, 70k QC)
+psql -d anrdms_benchmark -v ON_ERROR_STOP=1 \
+  -f portfolio-2-query-optimisation/benchmark_data.sql
+
+# 5. Execute the automated A/B indexing experiments (drops indexes, benchmarks baseline, creates indexes, re-benchmarks)
+psql -d anrdms_benchmark -v ON_ERROR_STOP=1 \
+  -P pager=off \
+  -f portfolio-2-query-optimisation/execution_plans.sql
+```
+
+> [!NOTE]
+> `execution_plans.sql` is completely self-contained: it explicitly drops existing secondary indexes, runs the unindexed baseline `EXPLAIN (ANALYZE, BUFFERS)` queries, constructs the targeted composite and partial indexes, refreshes planner statistics with `ANALYZE`, and re-runs the identical queries under optimized conditions. Running `indexes.sql` beforehand is not required.
+
+---
+
+## 8. Academic Integrity & Reproducibility
+
+All participant identifiers, acquisition logs, and quality scores used in this portfolio are synthetic and intended solely for academic demonstration in MIT 8103. The 100,000-record benchmark dataset represents a synthetic database workload generated to test PostgreSQL query optimizer scaling characteristics.
 
 All performance metrics, execution plans, and timing numbers represent actual, reproducible PostgreSQL 16 engine measurements.
 
 ---
 
-## 8. Development Status Checklist
+## 9. Development Status Checklist
 
 - [x] Folder structure and manifest initialization
 - [x] Advanced SQL queries authored and checked against schema

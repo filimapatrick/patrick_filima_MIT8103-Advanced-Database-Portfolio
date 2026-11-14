@@ -36,18 +36,20 @@ ANALYZE processing_jobs;
 -- ============================================================================
 
 -- Optimization for Experiment 1: Composite B-Tree Index on Sequence & Date
--- Eliminates Sequential Scan and in-memory Quicksort for temporal sequence queries
+-- Reduces full-table scanning for temporal sequence queries.
+-- PostgreSQL may select a Bitmap Heap Scan followed by a Sort
+-- depending on query selectivity and estimated execution cost.
 CREATE INDEX idx_scans_seq_date 
 ON mri_scans(sequence_type, acquisition_date DESC);
 
 -- Optimization for Experiment 2: Partial Filtered Index on Passing QC Scans
--- Indexes only usable passed scans, reducing index footprint by ~50%
+-- Indexes only usable passed scans, reducing physical index footprint (1,448 kB vs 2,184 kB full index)
 CREATE INDEX idx_qc_pass_usable_partial 
 ON qc_evaluations(scan_id) 
 WHERE overall_quality = 'PASS' AND usable_for_analysis = TRUE;
 
 -- Optimization for Experiment 3: Partial Index on Completed Processing Jobs
--- Accelerates NOT EXISTS subqueries and anti-joins for pipeline backlogs
+-- Accelerates NOT EXISTS subqueries and anti-joins (1,552 kB vs 2,488 kB full index)
 CREATE INDEX idx_jobs_completed_scan_partial 
 ON processing_jobs(scan_id) 
 WHERE status = 'COMPLETED';

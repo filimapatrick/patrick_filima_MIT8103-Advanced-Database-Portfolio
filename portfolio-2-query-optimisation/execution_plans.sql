@@ -110,7 +110,7 @@ ANALYZE processing_jobs;
 
 \echo '======================================================================'
 \echo 'OPTIMIZED EXPERIMENT 1: Temporal Sequence Filtering (With Composite Index)'
-\echo 'Expected Plan: Index Scan / Bitmap Index Scan, Sort Eliminated'
+\echo 'Expected Plan: Bitmap Index Scan + Bitmap Heap Scan + Sort (Seq Scan eliminated)'
 \echo '======================================================================'
 
 EXPLAIN (ANALYZE, BUFFERS)
