@@ -1,0 +1,53 @@
+============================================================================
+ANRDMS DISTRIBUTED & CLOUD DATABASE VERIFICATION SUITE
+Execution Timestamp: 2026-11-15 00:14:39
+Target Database: anrdms_distributed
+DBMS: PostgreSQL 16 Enterprise (Distributed Simulation)
+============================================================================
+
+============================================================================
+PART 1: DECLARATIVE HORIZONTAL LIST PARTITIONING & PRUNING
+============================================================================
+[*] Executing partitioning script: /Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-5-distributed-cloud/scripts/partitioning_sharding.sql
+    [+] Partitioning DDL and execution plans executed successfully.
+
+--- Verified Record Distribution Across Regional Partitions ---
+Partition Name            | Site ID         | Scans Count
+-------------------------------------------------------
+mri_scans_abuja           | SITE-ABJ-01     | 9
+mri_scans_enugu           | SITE-ENU-01     | 6
+mri_scans_ibadan          | SITE-IBD-01     | 7
+mri_scans_lagos           | SITE-LOS-01     | 9
+mri_scans_zaria           | SITE-ZAR-01     | 6
+
+--- Partition Pruning Assertion ---
+[PASS] Single-site query on 'SITE-LOS-01' scanned ONLY mri_scans_lagos.
+       Abuja, Ibadan, Enugu, and Zaria partitions were completely pruned by optimizer.
+
+============================================================================
+PART 2: DISTRIBUTED TWO-PHASE COMMIT (2PC) PROTOCOL
+============================================================================
+[*] Executing Two-Phase Commit suite: /Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-5-distributed-cloud/scripts/two_phase_commit.sql
+[PASS] Experiment 1 (Happy Path): Participant ANRDMS-LOS-002 affiliation atomically committed to SITE-ABJ-01.
+[PASS] Experiment 2 (Failure Scenario): Distributed abort cleanly rolled back.
+       Participant remains at SITE-IBD-01; no orphan scans created in mri_scans.
+[PASS] System catalog pg_prepared_xacts has 0 in-doubt transactions remaining.
+
+============================================================================
+PART 3: POSTGRES_FDW CROSS-NODE FEDERATION & PUSHDOWN
+============================================================================
+[*] Executing federation script: /Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-5-distributed-cloud/scripts/postgres_fdw_federation.sql
+[PASS] Remote Filter Pushdown verified: WHERE clause pushed to remote hospital node.
+       Only matching T1w tuples are transferred over the simulated WAN.
+[PASS] Cross-node distributed JOIN executed successfully (matched 36 records).
+
+============================================================================
+PART 4: STREAMING REPLICATION & HIGH AVAILABILITY PARAMETERS
+============================================================================
+[*] Executing replication audit script: /Users/patrick/Downloads/patrick_filima_MIT8103-Advanced-Database-Portfolio/portfolio-5-distributed-cloud/scripts/replication_ha_config.sql
+[PASS] Streaming Replication Parameters: wal_level='replica', max_wal_senders=10, max_replication_slots=10.
+       Physical replication slots lifecycle and WAL LSN telemetry successfully verified.
+
+============================================================================
+ALL DISTRIBUTED DATABASE EXPERIMENTS PASSED (100% PASS RATE)
+============================================================================

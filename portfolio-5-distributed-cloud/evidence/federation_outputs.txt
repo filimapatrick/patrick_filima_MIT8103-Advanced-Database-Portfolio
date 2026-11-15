@@ -1,0 +1,179 @@
+\timing on
+Timing is on.
+-- ============================================================================
+-- 1. FEDERATED DATABASE ARCHITECTURE & POSTGRES_FDW MOTIVATION
+-- ============================================================================
+-- In developing economies with distributed clinical infrastructure, centralizing
+-- all raw neuroimaging data into a single physical database can cause severe
+-- bandwidth bottlenecks across Nigerian WAN networks.
+--
+-- Foreign Data Wrapper (postgres_fdw, ISO/IEC 9075-9 SQL/MED standard) allows a
+-- central national coordination portal to mount remote hospital database nodes
+-- as transparent local foreign tables.
+--
+-- Crucially, postgres_fdw implements "Filter & Aggregation Pushdown":
+-- Instead of dragging gigabytes of uncurated scan records across the WAN to
+-- filter them locally, the central coordinator pushes the WHERE clause down
+-- to the remote hospital node. Only matching rows are transferred over the wire.
+-- ============================================================================
+CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+CREATE EXTENSION
+Time: 0.271 ms
+-- Drop foreign objects if they exist
+DROP FOREIGN TABLE IF EXISTS foreign_abuja_mri_scans CASCADE;
+DROP FOREIGN TABLE
+Time: 1.177 ms
+DROP USER MAPPING IF EXISTS FOR CURRENT_USER SERVER remote_abuja_hospital_node;
+DROP USER MAPPING
+Time: 0.218 ms
+DROP SERVER IF EXISTS remote_abuja_hospital_node CASCADE;
+DROP SERVER
+Time: 0.133 ms
+-- ============================================================================
+-- 2. CONFIGURING REMOTE FOREIGN SERVER & USER MAPPING
+-- ============================================================================
+-- Simulate remote regional hospital node: National Hospital Abuja (NHA)
+-- Connecting via local loopback to anrdms_transactions database
+CREATE SERVER remote_abuja_hospital_node
+    FOREIGN DATA WRAPPER postgres_fdw
+    OPTIONS (
+        dbname 'anrdms_transactions',
+        host 'localhost',
+        port '5432',
+        fetch_size '100',
+        use_remote_estimate 'true'
+    );
+CREATE SERVER
+Time: 4.456 ms
+CREATE USER MAPPING FOR CURRENT_USER
+    SERVER remote_abuja_hospital_node
+    OPTIONS (
+        user 'patrick'
+    );
+CREATE USER MAPPING
+Time: 0.201 ms
+-- ============================================================================
+-- 3. MOUNTING REMOTE FOREIGN TABLE
+-- ============================================================================
+-- Transparently map the remote hospital node's mri_scans table
+CREATE FOREIGN TABLE foreign_abuja_mri_scans (
+    scan_id VARCHAR(30) NOT NULL,
+    participant_id VARCHAR(25) NOT NULL,
+    scanner_id VARCHAR(20) NOT NULL,
+    project_id VARCHAR(20) NOT NULL,
+    acquisition_date TIMESTAMPTZ NOT NULL,
+    modality VARCHAR(10) NOT NULL,
+    sequence_type VARCHAR(25) NOT NULL,
+    repetition_time_ms NUMERIC(8,2) NOT NULL,
+    echo_time_ms NUMERIC(6,2) NOT NULL,
+    flip_angle_deg NUMERIC(4,1),
+    voxel_size_x_mm NUMERIC(4,2) NOT NULL,
+    voxel_size_y_mm NUMERIC(4,2) NOT NULL,
+    voxel_size_z_mm NUMERIC(4,2) NOT NULL,
+    matrix_x INT NOT NULL,
+    matrix_y INT NOT NULL,
+    slices_count INT NOT NULL,
+    dicom_series_uid VARCHAR(120) NOT NULL,
+    bids_relative_path VARCHAR(255) NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+)
+SERVER remote_abuja_hospital_node
+OPTIONS (
+    table_name 'mri_scans'
+);
+CREATE FOREIGN TABLE
+Time: 1.302 ms
+-- ============================================================================
+-- 4. FEDERATED QUERY EXECUTION & PUSHDOWN VERIFICATION
+-- ============================================================================
+-- ----------------------------------------------------------------------------
+-- EXPERIMENT 1: Remote Filter Pushdown Demonstration
+-- Expected Plan: Foreign Scan on foreign_abuja_mri_scans showing:
+--   "Remote SQL: SELECT ... WHERE ((sequence_type = 'T1w'))"
+-- Proves that filtering occurs on the remote node prior to WAN data transit.
+-- ----------------------------------------------------------------------------
+\echo '=== EXPERIMENT 1: Verifying Remote Filter Pushdown via EXPLAIN VERBOSE ==='
+=== EXPERIMENT 1: Verifying Remote Filter Pushdown via EXPLAIN VERBOSE ===
+EXPLAIN (ANALYZE, VERBOSE, BUFFERS)
+SELECT 
+    scan_id,
+    participant_id,
+    sequence_type,
+    repetition_time_ms,
+    echo_time_ms,
+    ROUND(file_size_bytes / (1024.0 * 1024.0), 2) AS file_size_mb
+FROM foreign_abuja_mri_scans
+WHERE sequence_type = 'T1w';
+                                                                              QUERY PLAN                                                                              
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan on public.foreign_abuja_mri_scans  (cost=100.14..108.19 rows=1 width=274) (actual time=0.255..0.260 rows=27 loops=1)
+   Output: scan_id, participant_id, sequence_type, repetition_time_ms, echo_time_ms, round(((file_size_bytes)::numeric / 1048576.00), 2)
+   Remote SQL: SELECT scan_id, participant_id, sequence_type, repetition_time_ms, echo_time_ms, file_size_bytes FROM public.mri_scans WHERE ((sequence_type = 'T1w'))
+ Planning:
+   Buffers: shared hit=62
+ Planning Time: 20.357 ms
+ Execution Time: 0.356 ms
+(7 rows)
+
+Time: 21.404 ms
+-- ----------------------------------------------------------------------------
+-- EXPERIMENT 2: Cross-Node Distributed JOIN
+-- Scenario: Join local national participant ethics registry with remote
+-- hospital imaging scans.
+-- ----------------------------------------------------------------------------
+\echo '=== EXPERIMENT 2: Cross-Node Federated JOIN (Local Participants + Remote Scans) ==='
+=== EXPERIMENT 2: Cross-Node Federated JOIN (Local Participants + Remote Scans) ===
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT 
+    p.participant_id,
+    p.biological_sex,
+    p.birth_year,
+    f.scan_id,
+    f.sequence_type,
+    f.acquisition_date
+FROM participants p
+JOIN foreign_abuja_mri_scans f ON p.participant_id = f.participant_id
+ORDER BY f.acquisition_date DESC
+LIMIT 5;
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=112.52..117.44 rows=5 width=264) (actual time=0.226..0.232 rows=5 loops=1)
+   Buffers: shared hit=12
+   ->  Nested Loop  (cost=112.52..171.63 rows=60 width=264) (actual time=0.226..0.231 rows=5 loops=1)
+         Buffers: shared hit=12
+         ->  Foreign Scan on foreign_abuja_mri_scans f  (cost=112.37..113.72 rows=60 width=222) (actual time=0.212..0.212 rows=7 loops=1)
+         ->  Index Scan using participants_pkey on participants p  (cost=0.15..0.96 rows=1 width=110) (actual time=0.002..0.002 rows=1 loops=7)
+               Index Cond: ((participant_id)::text = (f.participant_id)::text)
+               Buffers: shared hit=12
+ Planning:
+   Buffers: shared hit=157
+ Planning Time: 0.809 ms
+ Execution Time: 0.323 ms
+(12 rows)
+
+Time: 1.404 ms
+-- Execute the federated query to inspect actual rows returned:
+SELECT 
+    p.participant_id,
+    p.biological_sex,
+    p.birth_year,
+    f.scan_id,
+    f.sequence_type,
+    f.acquisition_date
+FROM participants p
+JOIN foreign_abuja_mri_scans f ON p.participant_id = f.participant_id
+ORDER BY f.acquisition_date DESC
+LIMIT 5;
+ participant_id | biological_sex | birth_year |    scan_id     | sequence_type |    acquisition_date    
+----------------+----------------+------------+----------------+---------------+------------------------
+ ANRDMS-ZAR-005 | Female         |       1977 | SCN-ZAR-005-T1 | T1w           | 2025-06-25 14:40:00+01
+ ANRDMS-ENU-005 | Male           |       1967 | SCN-ENU-005-T1 | T1w           | 2025-06-20 15:30:00+01
+ ANRDMS-IBD-005 | Female         |       1992 | SCN-IBD-005-T1 | T1w           | 2025-05-28 16:00:00+01
+ ANRDMS-ABJ-005 | Male           |       1979 | SCN-ABJ-005-T1 | T1w           | 2025-05-22 15:10:00+01
+ ANRDMS-ZAR-004 | Male           |       1966 | SCN-ZAR-004-T1 | T1w           | 2025-05-12 10:15:00+01
+(5 rows)
+
+Time: 0.885 ms
+\echo '=== POSTGRES_FDW FEDERATION DEMONSTRATION COMPLETE ==='
+=== POSTGRES_FDW FEDERATION DEMONSTRATION COMPLETE ===
