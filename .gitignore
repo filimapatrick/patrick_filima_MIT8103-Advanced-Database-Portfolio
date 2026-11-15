@@ -1,0 +1,13 @@
+# Archives and packaging
+*.zip
+*.tar.gz
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Local environments
+.env
